@@ -77,12 +77,20 @@ export function InboxModule() {
   const checkEmailAccount = async () => {
     if (!user?.id) return;
 
-    const { data } = await supabase
+    console.log('[INBOX] Checking email account for user:', user.id);
+
+    const { data, error } = await supabase
       .from('email_accounts')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('created_by', user.id)
       .eq('is_active', true)
       .maybeSingle();
+
+    if (error) {
+      console.error('[INBOX] Error checking email account:', error);
+    } else {
+      console.log('[INBOX] Email account found:', !!data);
+    }
 
     setHasEmailAccount(!!data);
   };
@@ -90,12 +98,29 @@ export function InboxModule() {
   const loadEmails = async () => {
     if (!user?.id) return;
 
+    console.log('[INBOX] Loading emails for folder:', activeFolder);
     setLoading(true);
     try {
+      const { data: account } = await supabase
+        .from('email_accounts')
+        .select('id')
+        .eq('created_by', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!account) {
+        console.log('[INBOX] No email account found');
+        setEmails([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('[INBOX] Using account ID:', account.id);
+
       let query = supabase
         .from('inbox_emails')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('account_id', account.id)
         .order('email_date', { ascending: false });
 
       if (activeFolder === 'inbox') {
@@ -114,7 +139,12 @@ export function InboxModule() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('[INBOX] Error loading emails:', error);
+        throw error;
+      }
+
+      console.log(`[INBOX] Loaded ${data?.length || 0} emails for folder ${activeFolder}`);
       setEmails(data || []);
     } catch (error: any) {
       toast.error(`Error al cargar emails: ${error.message}`);
@@ -124,13 +154,39 @@ export function InboxModule() {
   };
 
   const handleSyncEmails = async () => {
+    if (!user?.id) return;
+
+    console.log('[INBOX] Starting email sync');
     toast.info('Sincronizando emails...');
     setLoading(true);
+
     try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      console.log('[INBOX] Calling sync-inbox-emails function');
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/sync-inbox-emails`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id })
+      });
+
+      const result = await response.json();
+      console.log('[INBOX] Sync result:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al sincronizar');
+      }
+
       await loadEmails();
-      toast.success('Emails sincronizados correctamente');
-    } catch (error) {
-      toast.error('Error al sincronizar emails');
+      toast.success(result.message || 'Emails sincronizados correctamente');
+    } catch (error: any) {
+      console.error('[INBOX] Sync error:', error);
+      toast.error(`Error al sincronizar: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -225,6 +281,8 @@ export function InboxModule() {
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user?.id) return;
+
     if (composeData.to_emails.length === 0 && toInput) {
       composeData.to_emails = toInput.split(',').map(e => e.trim()).filter(e => e);
     }
@@ -240,14 +298,51 @@ export function InboxModule() {
       return;
     }
 
+    console.log('[INBOX] Sending email:', {
+      to: composeData.to_emails,
+      subject: composeData.subject
+    });
+
     toast.info('Enviando email...');
 
     try {
-      toast.success('Email enviado correctamente');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      console.log('[INBOX] Calling send-inbox-email function');
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-inbox-email`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          to_emails: composeData.to_emails,
+          cc_emails: composeData.cc_emails,
+          bcc_emails: composeData.bcc_emails,
+          subject: composeData.subject,
+          body_html: composeData.body_html,
+          body_text: composeData.body_html.replace(/<[^>]*>/g, ''),
+          reply_to_id: composeData.reply_to_id,
+          forward_from_id: composeData.forward_from_id
+        })
+      });
+
+      const result = await response.json();
+      console.log('[INBOX] Send result:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al enviar email');
+      }
+
+      toast.success(result.message || 'Email enviado correctamente');
       setShowCompose(false);
       resetCompose();
-      loadEmails();
+      await loadEmails();
     } catch (error: any) {
+      console.error('[INBOX] Send error:', error);
       toast.error(`Error al enviar: ${error.message}`);
     }
   };
@@ -268,24 +363,29 @@ export function InboxModule() {
         return;
       }
 
+      console.log('[INBOX] Saving draft');
+
       const draftData = {
         account_id: account.id,
-        user_id: user.id,
         to_emails: composeData.to_emails,
         cc_emails: composeData.cc_emails,
         bcc_emails: composeData.bcc_emails,
         subject: composeData.subject,
         body_html: composeData.body_html,
-        reply_to_id: composeData.reply_to_id,
-        forward_from_id: composeData.forward_from_id
+        in_reply_to: composeData.reply_to_id,
+        created_by: user.id
       };
 
       const { error } = await supabase
         .from('email_drafts')
         .insert(draftData);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[INBOX] Error saving draft:', error);
+        throw error;
+      }
 
+      console.log('[INBOX] Draft saved successfully');
       toast.success('Borrador guardado');
       setShowCompose(false);
       resetCompose();
