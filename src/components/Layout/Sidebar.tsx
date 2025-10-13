@@ -12,7 +12,8 @@ import {
   LogOut,
   DollarSign,
   Menu,
-  X
+  X,
+  User
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -35,7 +36,7 @@ const menuItems = [
 ];
 
 export function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleModuleChange = (module: string) => {
@@ -102,7 +103,25 @@ export function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-4 border-t border-slate-700 space-y-3">
+        {user && (
+          <div className="px-4 py-3 bg-slate-700/50 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0 bg-blue-600 rounded-full p-2">
+                <User className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  {user.name}
+                </p>
+                <p className="text-xs text-slate-400 truncate">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <button
           onClick={signOut}
           className="w-full flex items-center space-x-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-all"
