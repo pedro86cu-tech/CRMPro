@@ -30,6 +30,8 @@ export function CallModal({ isOpen, onClose, phoneNumber, callSid, contactInfo, 
   const [callDuration, setCallDuration] = useState(0);
   const [isCallActive, setIsCallActive] = useState(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [callNotes, setCallNotes] = useState('');
   const [callStatus, setCallStatus] = useState<'completed' | 'in_progress' | 'missed' | 'cancelled' | 'no_answer' | ''>('');
   const [createTicket, setCreateTicket] = useState(false);
@@ -105,8 +107,15 @@ export function CallModal({ isOpen, onClose, phoneNumber, callSid, contactInfo, 
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      toast.info('Llamada finalizada. Cargando grabación...');
-      setIsLoadingRecording(true);
+      toast.info('Llamada finalizada.');
+
+      // Esperar un poco antes de intentar cargar la grabación
+      if (callSid) {
+        setTimeout(() => {
+          setIsLoadingRecording(true);
+          loadRecording();
+        }, 5000); // Esperar 5 segundos para que Twilio procese
+      }
     };
 
     twilioCall.on('disconnect', handleDisconnect);
@@ -114,7 +123,7 @@ export function CallModal({ isOpen, onClose, phoneNumber, callSid, contactInfo, 
     return () => {
       twilioCall.removeListener('disconnect', handleDisconnect);
     };
-  }, [twilioCall, toast]);
+  }, [twilioCall, toast, callSid]);
 
   useEffect(() => {
     if (!isOpen || !callSid) return;
@@ -151,18 +160,18 @@ export function CallModal({ isOpen, onClose, phoneNumber, callSid, contactInfo, 
               setCallDuration(call.duration);
             }
 
-            // Mostrar notificación y esperar 2 segundos para cargar grabación
-            toast.info('Llamada finalizada. Cargando grabación...');
-            setIsLoadingRecording(true);
+            // Mostrar notificación
+            toast.info('Llamada finalizada.');
 
-            // Esperar para que la grabación se procese
-            setTimeout(() => {
-              if (call.recording_url) {
-                toast.success('Grabación cargada. Puedes guardar o continuar editando.');
-              } else {
-                toast.info('Grabación en proceso. Aparecerá automáticamente.');
-              }
-            }, 3000);
+            // Si no hay grabación, intentar cargarla
+            if (!call.recording_url) {
+              setIsLoadingRecording(true);
+
+              // Esperar un poco más antes de intentar cargar
+              setTimeout(() => {
+                loadRecording();
+              }, 5000); // Esperar 5 segundos antes de empezar a buscar
+            }
           }
         }
       )
@@ -311,7 +320,18 @@ export function CallModal({ isOpen, onClose, phoneNumber, callSid, contactInfo, 
   };
 
   const loadRecording = async () => {
-    if (!callSid) return;
+    if (!callSid) {
+      setIsLoadingRecording(false);
+      return;
+    }
+
+    // Limpiar timers previos
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+    }
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+    }
 
     setIsLoadingRecording(true);
 
@@ -349,21 +369,51 @@ export function CallModal({ isOpen, onClose, phoneNumber, callSid, contactInfo, 
 
     // Si no se encontró, esperar y reintentar
     let attempts = 0;
-    const maxAttempts = 10;
-    const intervalId = setInterval(async () => {
+    const maxAttempts = 8; // 8 intentos (24 segundos)
+    recordingIntervalRef.current = setInterval(async () => {
       attempts++;
 
       const found = await checkRecording();
 
       if (found) {
-        clearInterval(intervalId);
+        if (recordingIntervalRef.current) {
+          clearInterval(recordingIntervalRef.current);
+        }
+        if (recordingTimeoutRef.current) {
+          clearTimeout(recordingTimeoutRef.current);
+        }
       } else if (attempts >= maxAttempts) {
-        clearInterval(intervalId);
+        if (recordingIntervalRef.current) {
+          clearInterval(recordingIntervalRef.current);
+        }
         setIsLoadingRecording(false);
-        toast.info('La grabación se procesará en segundo plano. Aparecerá automáticamente cuando esté lista.');
+        // No mostrar el mensaje si ya hay una grabación
+        if (!recordingUrl) {
+          toast.info('La grabación aparecerá automáticamente cuando Twilio la procese.');
+        }
       }
     }, 3000);
+
+    // Asegurarse de limpiar el intervalo después de un tiempo máximo
+    recordingTimeoutRef.current = setTimeout(() => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      setIsLoadingRecording(false);
+    }, 30000); // Timeout absoluto de 30 segundos
   };
+
+  // Limpiar timers cuando el componente se desmonte
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSave = async () => {
     if (!callId) {
