@@ -70,6 +70,7 @@ Deno.serve(async (req: Request) => {
 
     const sentEmail = {
       account_id: account.id,
+      user_id: userId,
       message_id: `<sent-${Date.now()}@${account.email_address.split('@')[1]}>`,
       thread_id: reply_to_id || forward_from_id || null,
       from_email: account.email_address,
@@ -91,6 +92,7 @@ Deno.serve(async (req: Request) => {
     };
 
     console.log('[SEND-EMAIL] Saving to sent folder in database');
+    console.log('[SEND-EMAIL] Email data:', sentEmail);
 
     const { data: savedEmail, error: insertError } = await supabase
       .from('inbox_emails')
@@ -100,6 +102,7 @@ Deno.serve(async (req: Request) => {
 
     if (insertError) {
       console.error('[SEND-EMAIL] Error saving sent email:', insertError);
+      console.error('[SEND-EMAIL] Error details:', JSON.stringify(insertError, null, 2));
       throw insertError;
     }
 

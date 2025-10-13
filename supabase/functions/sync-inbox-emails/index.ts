@@ -116,17 +116,25 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
 
           if (!existing) {
-            const { error: insertError } = await supabase
+            const emailToInsert = {
+              ...email,
+              account_id: account.id,
+              user_id: userId,
+            };
+
+            console.log(`[SYNC-INBOX] Attempting to insert email:`, emailToInsert.subject);
+
+            const { data: inserted, error: insertError } = await supabase
               .from('inbox_emails')
-              .insert({
-                ...email,
-                account_id: account.id,
-              });
+              .insert(emailToInsert)
+              .select();
 
             if (insertError) {
               console.error(`[SYNC-INBOX] Error inserting email ${email.message_id}:`, insertError);
+              console.error(`[SYNC-INBOX] Error details:`, JSON.stringify(insertError, null, 2));
             } else {
-              console.log(`[SYNC-INBOX] Inserted email: ${email.subject}`);
+              console.log(`[SYNC-INBOX] Successfully inserted email: ${email.subject}`);
+              console.log(`[SYNC-INBOX] Inserted data:`, inserted);
               totalSynced++;
             }
           } else {
@@ -136,11 +144,13 @@ Deno.serve(async (req: Request) => {
 
         const { error: updateError } = await supabase
           .from('email_accounts')
-          .update({ last_sync_at: new Date().toISOString() })
+          .update({ last_sync: new Date().toISOString() })
           .eq('id', account.id);
 
         if (updateError) {
-          console.error('[SYNC-INBOX] Error updating last_sync_at:', updateError);
+          console.error('[SYNC-INBOX] Error updating last_sync:', updateError);
+        } else {
+          console.log('[SYNC-INBOX] Updated last_sync timestamp');
         }
 
         console.log(`[SYNC-INBOX] Completed sync for account: ${account.email_address}`);
