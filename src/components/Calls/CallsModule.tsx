@@ -378,15 +378,15 @@ export function CallsModule() {
   };
 
   return (
-    <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
             Llamadas
           </h1>
-          <p className="text-slate-600 mt-2 text-lg">Registra y gestiona tus llamadas</p>
+          <p className="text-slate-600 mt-2 text-sm sm:text-base lg:text-lg">Registra y gestiona tus llamadas</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => setShowRetryListModal(true)}
             className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition shadow-lg ${

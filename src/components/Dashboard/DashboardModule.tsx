@@ -281,12 +281,12 @@ export function DashboardModule() {
   };
 
   return (
-    <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+    <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
           Dashboard Ejecutivo
         </h1>
-        <p className="text-slate-600 mt-2 text-lg">Vista completa del rendimiento de tu negocio</p>
+        <p className="text-slate-600 mt-2 text-sm sm:text-base lg:text-lg">Vista completa del rendimiento de tu negocio</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

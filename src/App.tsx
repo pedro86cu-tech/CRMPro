@@ -83,10 +83,12 @@ function MainApp() {
 
   return (
     <DialerProvider>
-      <div className="flex h-screen bg-slate-100">
+      <div className="flex h-screen bg-slate-100 overflow-hidden">
         <Sidebar activeModule={activeModule} onModuleChange={setActiveModule} />
-        <div className="flex-1 overflow-y-auto">
-          {renderModule()}
+        <div className="flex-1 overflow-y-auto w-full">
+          <div className="pt-16 lg:pt-0">
+            {renderModule()}
+          </div>
         </div>
         <PhoneDialer makeCall={makeCall} isDeviceReady={isReady} activeCall={activeCall} />
         <IncomingCallNotification onAccept={handleAcceptIncomingCall} />

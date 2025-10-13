@@ -318,7 +318,7 @@ export function PhoneDialer({ makeCall, isDeviceReady, activeCall }: PhoneDialer
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 z-40 group ${
+        className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 z-40 group ${
           isOpen
             ? 'bg-red-500 hover:bg-red-600 rotate-0'
             : 'bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 hover:scale-110'
@@ -334,7 +334,7 @@ export function PhoneDialer({ makeCall, isDeviceReady, activeCall }: PhoneDialer
       {isOpen && (
         <div
           ref={dialerRef}
-          className="fixed bottom-24 right-6 w-[400px] max-h-[calc(100vh-120px)] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in slide-in-from-bottom-5 duration-300 flex flex-col"
+          className="fixed bottom-20 right-2 left-2 sm:bottom-24 sm:right-6 sm:left-auto w-auto sm:w-[400px] max-h-[calc(100vh-90px)] sm:max-h-[calc(100vh-120px)] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in slide-in-from-bottom-5 duration-300 flex flex-col"
         >
           <div className="bg-gradient-to-r from-green-600 to-green-700 px-5 py-3 flex-shrink-0">
             <div className="flex items-center justify-between mb-3">

@@ -268,12 +268,12 @@ export function ClientsModule() {
   };
 
   return (
-    <div className="p-8 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 min-h-screen">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+    <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 min-h-screen">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
           Gestión de Clientes
         </h1>
-        <p className="text-slate-600 text-lg">Administra tu cartera de clientes y sus métricas</p>
+        <p className="text-slate-600 text-sm sm:text-base lg:text-lg">Administra tu cartera de clientes y sus métricas</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
