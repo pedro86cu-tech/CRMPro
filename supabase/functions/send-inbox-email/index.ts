@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@6.9.7';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,7 +45,8 @@ Deno.serve(async (req: Request) => {
       body_html,
       body_text,
       reply_to_id,
-      forward_from_id
+      forward_from_id,
+      attachments = []
     } = await req.json();
 
     console.log(`[SEND-EMAIL] ✓ Sending email for user: ${userId}`);
@@ -52,6 +54,7 @@ Deno.serve(async (req: Request) => {
     console.log(`[SEND-EMAIL] Subject: ${subject}`);
     console.log(`[SEND-EMAIL] CC: ${cc_emails?.join(', ') || 'none'}`);
     console.log(`[SEND-EMAIL] BCC: ${bcc_emails?.join(', ') || 'none'}`);
+    console.log(`[SEND-EMAIL] Attachments: ${attachments.length}`);
 
     console.log('[SEND-EMAIL] Querying email_accounts table...');
     console.log('[SEND-EMAIL] Query params: created_by =', userId, ', is_active = true');
@@ -82,12 +85,64 @@ Deno.serve(async (req: Request) => {
     console.log(`[SEND-EMAIL] SMTP: ${account.smtp_host}:${account.smtp_port}`);
     console.log(`[SEND-EMAIL] Display name: ${account.display_name || 'none'}`);
 
-    console.log('[SEND-EMAIL] ⚠ Simulating SMTP send (MOCK MODE)');
+    console.log('[SEND-EMAIL] 📧 Creating SMTP transporter...');
+
+    const transporter = nodemailer.createTransport({
+      host: account.smtp_host,
+      port: account.smtp_port,
+      secure: account.use_ssl,
+      auth: {
+        user: account.smtp_username,
+        pass: account.smtp_password,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+
+    console.log('[SEND-EMAIL] ✓ SMTP transporter created');
+
+    console.log('[SEND-EMAIL] Verifying SMTP connection...');
+    try {
+      await transporter.verify();
+      console.log('[SEND-EMAIL] ✓ SMTP connection verified');
+    } catch (verifyError) {
+      console.error('[SEND-EMAIL] ❌ SMTP verification failed:', verifyError);
+      throw new Error(`Error de conexión SMTP: ${verifyError.message}`);
+    }
+
+    const mailAttachments = attachments.map((att: any) => ({
+      filename: att.filename,
+      content: att.content,
+      encoding: 'base64',
+      contentType: att.type,
+    }));
+
+    const mailOptions = {
+      from: account.display_name
+        ? `"${account.display_name}" <${account.email_address}>`
+        : account.email_address,
+      to: to_emails.join(', '),
+      cc: cc_emails?.join(', ') || undefined,
+      bcc: bcc_emails?.join(', ') || undefined,
+      subject: subject,
+      text: body_text || body_html.replace(/<[^>]*>/g, ''),
+      html: body_html,
+      attachments: mailAttachments,
+    };
+
+    console.log('[SEND-EMAIL] 📤 Sending email via SMTP...');
+
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log('[SEND-EMAIL] ✓ Email sent via SMTP');
+    console.log('[SEND-EMAIL] Message ID from server:', info.messageId);
+    console.log('[SEND-EMAIL] Response:', info.response);
 
     const sentEmail = {
       account_id: account.id,
       user_id: userId,
-      message_id: `<sent-${Date.now()}@${account.email_address.split('@')[1]}>`,
+      message_id: info.messageId || `<sent-${Date.now()}@${account.email_address.split('@')[1]}>`,
       thread_id: reply_to_id || forward_from_id || null,
       from_email: account.email_address,
       from_name: account.display_name || account.email_address,
@@ -97,7 +152,11 @@ Deno.serve(async (req: Request) => {
       subject,
       body_text: body_text || body_html.replace(/<[^>]*>/g, ''),
       body_html: body_html,
-      attachments: [],
+      attachments: attachments.map((att: any) => ({
+        filename: att.filename,
+        size: att.size,
+        type: att.type,
+      })),
       is_read: true,
       is_starred: false,
       is_archived: false,
@@ -143,7 +202,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    console.log('[SEND-EMAIL] ✓ Email sent successfully');
+    console.log('[SEND-EMAIL] ========== EMAIL SENT SUCCESSFULLY ==========');
 
     return new Response(
       JSON.stringify({
@@ -151,12 +210,13 @@ Deno.serve(async (req: Request) => {
         message: 'Email enviado correctamente',
         email_id: savedEmail.id,
         message_id: sentEmail.message_id,
+        smtp_response: info.response,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('[SEND-EMAIL] Fatal error:', error);
+    console.error('[SEND-EMAIL] ❌ Fatal error:', error);
     return new Response(
       JSON.stringify({
         error: 'Error al enviar email',

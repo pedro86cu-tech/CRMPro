@@ -1,10 +1,171 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import Imap from 'npm:imap@0.8.19';
+import { simpleParser } from 'npm:mailparser@3.6.5';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
+
+interface EmailAccount {
+  id: string;
+  email_address: string;
+  imap_host: string;
+  imap_port: number;
+  imap_username: string;
+  imap_password: string;
+  use_ssl: boolean;
+}
+
+async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supabase: any): Promise<number> {
+  return new Promise((resolve, reject) => {
+    console.log(`[SYNC-INBOX] 📧 Connecting to IMAP: ${account.imap_host}:${account.imap_port}`);
+
+    const imap = new Imap({
+      user: account.imap_username,
+      password: account.imap_password,
+      host: account.imap_host,
+      port: account.imap_port,
+      tls: account.use_ssl,
+      tlsOptions: { rejectUnauthorized: false },
+    });
+
+    let syncedCount = 0;
+
+    imap.once('ready', () => {
+      console.log('[SYNC-INBOX] ✓ IMAP connection established');
+
+      imap.openBox('INBOX', false, async (err, box) => {
+        if (err) {
+          console.error('[SYNC-INBOX] ❌ Error opening INBOX:', err);
+          imap.end();
+          reject(err);
+          return;
+        }
+
+        console.log(`[SYNC-INBOX] ✓ INBOX opened. Total messages: ${box.messages.total}`);
+
+        if (box.messages.total === 0) {
+          console.log('[SYNC-INBOX] No messages in INBOX');
+          imap.end();
+          resolve(0);
+          return;
+        }
+
+        const fetchCount = Math.min(50, box.messages.total);
+        const startSeq = Math.max(1, box.messages.total - fetchCount + 1);
+        console.log(`[SYNC-INBOX] Fetching last ${fetchCount} messages (${startSeq}:${box.messages.total})`);
+
+        const fetch = imap.seq.fetch(`${startSeq}:*`, {
+          bodies: '',
+          struct: true,
+        });
+
+        fetch.on('message', (msg, seqno) => {
+          console.log(`[SYNC-INBOX] Processing message #${seqno}`);
+
+          msg.on('body', (stream) => {
+            simpleParser(stream, async (err, parsed) => {
+              if (err) {
+                console.error(`[SYNC-INBOX] ❌ Error parsing message #${seqno}:`, err);
+                return;
+              }
+
+              try {
+                const messageId = parsed.messageId || `<generated-${Date.now()}-${seqno}@${account.email_address.split('@')[1]}>`;
+
+                console.log(`[SYNC-INBOX] Message #${seqno}: ${parsed.subject || '(no subject)'}`);
+                console.log(`[SYNC-INBOX] Message ID: ${messageId}`);
+
+                const { data: existing } = await supabase
+                  .from('inbox_emails')
+                  .select('id')
+                  .eq('message_id', messageId)
+                  .maybeSingle();
+
+                if (existing) {
+                  console.log(`[SYNC-INBOX] ⊘ Message already exists, skipping`);
+                  return;
+                }
+
+                const attachments = parsed.attachments?.map(att => ({
+                  filename: att.filename || 'unnamed',
+                  size: att.size || 0,
+                  type: att.contentType || 'application/octet-stream',
+                  content: att.content ? att.content.toString('base64') : null,
+                })) || [];
+
+                console.log(`[SYNC-INBOX] Attachments: ${attachments.length}`);
+
+                const emailData = {
+                  account_id: account.id,
+                  user_id: userId,
+                  message_id: messageId,
+                  thread_id: parsed.inReplyTo || null,
+                  from_email: parsed.from?.value?.[0]?.address || '',
+                  from_name: parsed.from?.value?.[0]?.name || '',
+                  to_emails: parsed.to?.value?.map(t => ({ email: t.address, name: t.name })) || [],
+                  cc_emails: parsed.cc?.value?.map(t => ({ email: t.address, name: t.name })) || [],
+                  bcc_emails: [],
+                  subject: parsed.subject || '(Sin asunto)',
+                  body_text: parsed.text || '',
+                  body_html: parsed.html || parsed.textAsHtml || '',
+                  attachments: attachments,
+                  is_read: false,
+                  is_starred: false,
+                  is_archived: false,
+                  is_deleted: false,
+                  folder: 'inbox',
+                  labels: [],
+                  email_date: parsed.date?.toISOString() || new Date().toISOString(),
+                };
+
+                const { error: insertError } = await supabase
+                  .from('inbox_emails')
+                  .insert(emailData);
+
+                if (insertError) {
+                  console.error(`[SYNC-INBOX] ❌ Error inserting message #${seqno}:`, insertError);
+                } else {
+                  console.log(`[SYNC-INBOX] ✓ Inserted message: ${parsed.subject}`);
+                  syncedCount++;
+                }
+              } catch (error) {
+                console.error(`[SYNC-INBOX] ❌ Error processing message #${seqno}:`, error);
+              }
+            });
+          });
+        });
+
+        fetch.once('error', (err) => {
+          console.error('[SYNC-INBOX] ❌ Fetch error:', err);
+          imap.end();
+          reject(err);
+        });
+
+        fetch.once('end', () => {
+          console.log('[SYNC-INBOX] ✓ Fetch completed');
+          setTimeout(() => {
+            imap.end();
+          }, 2000);
+        });
+      });
+    });
+
+    imap.once('error', (err) => {
+      console.error('[SYNC-INBOX] ❌ IMAP connection error:', err);
+      reject(err);
+    });
+
+    imap.once('end', () => {
+      console.log('[SYNC-INBOX] ✓ IMAP connection closed');
+      resolve(syncedCount);
+    });
+
+    imap.connect();
+  });
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -68,105 +229,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`[SYNC-INBOX] Found ${accounts.length} email account(s)`);
-
     let totalSynced = 0;
 
     for (const account of accounts) {
       console.log(`[SYNC-INBOX] Processing account: ${account.email_address}`);
 
       try {
-        console.log(`[SYNC-INBOX] Connecting to IMAP: ${account.imap_host}:${account.imap_port}`);
-
-        const accountEmailDomain = account.email_address.split('@')[1];
-
-        const mockEmails = [
-          {
-            message_id: `<mock-email-1@${accountEmailDomain}>`,
-            thread_id: null,
-            from_email: 'sender1@example.com',
-            from_name: 'Test Sender 1',
-            to_emails: [{ email: account.email_address }],
-            cc_emails: [],
-            bcc_emails: [],
-            subject: 'Email de prueba sincronizado',
-            body_text: 'Este es un email de prueba sincronizado desde IMAP.',
-            body_html: '<p>Este es un email de prueba sincronizado desde IMAP.</p>',
-            attachments: [],
-            is_read: false,
-            is_starred: false,
-            is_archived: false,
-            is_deleted: false,
-            folder: 'inbox',
-            labels: [],
-            email_date: new Date().toISOString(),
-          },
-          {
-            message_id: `<mock-email-2@${accountEmailDomain}>`,
-            thread_id: null,
-            from_email: 'sender2@example.com',
-            from_name: 'Test Sender 2',
-            to_emails: [{ email: account.email_address }],
-            cc_emails: [],
-            bcc_emails: [],
-            subject: 'Otro email de prueba',
-            body_text: 'Contenido del segundo email de prueba.',
-            body_html: '<p>Contenido del segundo email de prueba.</p>',
-            attachments: [],
-            is_read: false,
-            is_starred: false,
-            is_archived: false,
-            is_deleted: false,
-            folder: 'inbox',
-            labels: [],
-            email_date: new Date(Date.now() - 3600000).toISOString(),
-          }
-        ];
-
-        console.log(`[SYNC-INBOX] Found ${mockEmails.length} new email(s) (MOCK DATA)`);
-
-        for (const email of mockEmails) {
-          console.log(`[SYNC-INBOX] Checking if email exists: ${email.message_id}`);
-
-          const { data: existing, error: checkError } = await supabase
-            .from('inbox_emails')
-            .select('id')
-            .eq('message_id', email.message_id)
-            .maybeSingle();
-
-          if (checkError) {
-            console.error(`[SYNC-INBOX] ❌ Error checking existing email:`, checkError);
-          }
-
-          if (!existing) {
-            console.log(`[SYNC-INBOX] ✓ Email does not exist, will insert`);
-            const emailToInsert = {
-              ...email,
-              account_id: account.id,
-              user_id: userId,
-            };
-
-            console.log(`[SYNC-INBOX] Attempting to insert email:`, emailToInsert.subject);
-
-            const { data: inserted, error: insertError } = await supabase
-              .from('inbox_emails')
-              .insert(emailToInsert)
-              .select();
-
-            if (insertError) {
-              console.error(`[SYNC-INBOX] ❌ Error inserting email ${email.message_id}:`, insertError);
-              console.error(`[SYNC-INBOX] Error code:`, insertError.code);
-              console.error(`[SYNC-INBOX] Error message:`, insertError.message);
-              console.error(`[SYNC-INBOX] Error details:`, JSON.stringify(insertError, null, 2));
-            } else {
-              console.log(`[SYNC-INBOX] ✓ Successfully inserted email: ${email.subject}`);
-              console.log(`[SYNC-INBOX] Email ID: ${inserted?.[0]?.id}`);
-              totalSynced++;
-            }
-          } else {
-            console.log(`[SYNC-INBOX] ⊘ Email already exists, skipping: ${email.message_id}`);
-          }
-        }
+        const synced = await fetchEmailsFromIMAP(account, userId, supabase);
+        totalSynced += synced;
 
         const { error: updateError } = await supabase
           .from('email_accounts')
@@ -179,13 +249,13 @@ Deno.serve(async (req: Request) => {
           console.log('[SYNC-INBOX] Updated last_sync timestamp');
         }
 
-        console.log(`[SYNC-INBOX] Completed sync for account: ${account.email_address}`);
-
+        console.log(`[SYNC-INBOX] ✓ Completed sync for account: ${account.email_address}`);
       } catch (accountError) {
-        console.error(`[SYNC-INBOX] Error syncing account ${account.email_address}:`, accountError);
+        console.error(`[SYNC-INBOX] ❌ Error syncing account ${account.email_address}:`, accountError);
       }
     }
 
+    console.log(`[SYNC-INBOX] ========== SYNC COMPLETED ==========`);
     console.log(`[SYNC-INBOX] Total emails synced: ${totalSynced}`);
 
     return new Response(
@@ -199,7 +269,7 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error) {
-    console.error('[SYNC-INBOX] Fatal error:', error);
+    console.error('[SYNC-INBOX] ❌ Fatal error:', error);
     return new Response(
       JSON.stringify({
         error: 'Error al sincronizar emails',
