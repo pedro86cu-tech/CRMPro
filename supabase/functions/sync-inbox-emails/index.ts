@@ -40,7 +40,9 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
     },
     tls: {
       rejectUnauthorized: false,
+      minVersion: 'TLSv1',
     },
+    disableAutoIdle: true,
   });
 
   let syncedCount = 0;
