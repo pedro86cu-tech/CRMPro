@@ -89,27 +89,8 @@ Deno.serve(async (req: Request) => {
         console.log("Call updated with recording successfully:", updateData);
       }
 
-      // También guardar en la tabla de grabaciones si existe
-      const recordingData = {
-        call_sid: callSid,
-        recording_sid: recordingSid,
-        recording_url: fullRecordingUrl,
-        duration: parseInt(recordingDuration, 10),
-        status: recordingStatus,
-        channels: parseInt(recordingChannels, 10),
-        created_at: new Date().toISOString()
-      };
-
-      const { error: recordingError } = await supabaseAdmin
-        .from('call_recordings')
-        .upsert(recordingData, { onConflict: 'recording_sid' });
-
-      if (recordingError) {
-        console.error("Error saving to call_recordings table:", recordingError);
-        console.log("This is OK if the table doesn't exist");
-      } else {
-        console.log("Recording saved to call_recordings table");
-      }
+      // Nota: No usamos una tabla separada call_recordings porque toda la información
+      // de grabación se almacena directamente en la tabla calls
     } else {
       console.log("Recording status is not completed:", recordingStatus);
     }
