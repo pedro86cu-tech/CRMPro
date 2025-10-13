@@ -24,13 +24,7 @@ export function LoginForm() {
           Sistema de gestión empresarial
         </p>
 
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800 text-center">
-            Utiliza el sistema de autenticación seguro para acceder
-          </p>
-        </div>
-
-        <button
+         <button
           onClick={handleLogin}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-[1.02] shadow-lg flex items-center justify-center space-x-3"
         >
