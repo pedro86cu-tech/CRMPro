@@ -48,46 +48,50 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
   const configs = [
     {
       ...baseConfig,
+      port: 993,
+      secure: true,
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2',
+        maxVersion: 'TLSv1.3',
+        servername: account.imap_host,
+      },
+      greetingTimeout: 120000,
+      socketTimeout: 120000,
+      connectionTimeout: 120000,
+      disableAutoIdle: true,
+      name: 'GoDaddy SSL/TLS directo 993 (timeouts muy largos)'
+    },
+    {
+      ...baseConfig,
+      port: 993,
+      secure: true,
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1',
+        servername: account.imap_host,
+      },
+      greetingTimeout: 90000,
+      socketTimeout: 90000,
+      connectionTimeout: 90000,
+      disableAutoIdle: true,
+      name: 'SSL/TLS directo 993 (TLS 1.0+)'
+    },
+    {
+      ...baseConfig,
       port: 143,
       secure: false,
       requireTLS: true,
       tls: {
         rejectUnauthorized: false,
         minVersion: 'TLSv1',
+        servername: account.imap_host,
       },
-      greetingTimeout: 30000,
+      greetingTimeout: 60000,
       socketTimeout: 60000,
       connectionTimeout: 60000,
       disableAutoIdle: true,
-      name: 'STARTTLS puerto 143 (timeout extendido)'
-    },
-    {
-      ...baseConfig,
-      port: 993,
-      secure: false,
-      requireTLS: true,
-      tls: {
-        rejectUnauthorized: false,
-      },
-      greetingTimeout: 30000,
-      socketTimeout: 60000,
-      connectionTimeout: 60000,
-      disableAutoIdle: true,
-      name: 'STARTTLS puerto 993'
-    },
-    {
-      ...baseConfig,
-      port: account.imap_port,
-      secure: account.use_ssl,
-      tls: {
-        rejectUnauthorized: false,
-        minVersion: 'TLSv1',
-        ciphers: 'ALL',
-      },
-      greetingTimeout: 30000,
-      socketTimeout: 60000,
-      disableAutoIdle: true,
-      name: 'SSL directo con timeouts extendidos'
+      name: 'STARTTLS puerto 143'
     },
   ];
 
