@@ -345,10 +345,15 @@ export function PhoneDialer({ makeCall, isDeviceReady, activeCall }: PhoneDialer
                 <h3 className="text-lg font-bold text-white">Marcador</h3>
               </div>
               <div className="flex items-center gap-1">
-                {twilioConfigured ? (
+                {twilioConfigured && isDeviceReady ? (
                   <>
                     <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
-                    <span className="text-xs text-green-100 font-medium">Twilio Activo</span>
+                    <span className="text-xs text-green-100 font-medium">Online</span>
+                  </>
+                ) : twilioConfigured && !isDeviceReady ? (
+                  <>
+                    <div className="w-2 h-2 bg-yellow-300 rounded-full animate-pulse"></div>
+                    <span className="text-xs text-green-100 font-medium">Conectando...</span>
                   </>
                 ) : (
                   <>
