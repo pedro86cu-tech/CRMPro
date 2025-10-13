@@ -18,16 +18,20 @@ interface EmailAccount {
   use_ssl: boolean;
 }
 
+async function tryImapConnection(config: any): Promise<ImapFlow> {
+  const client = new ImapFlow(config);
+  await client.connect();
+  return client;
+}
+
 async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supabase: any): Promise<number> {
   console.log(`[SYNC-INBOX] 📧 Connecting to IMAP: ${account.imap_host}:${account.imap_port}`);
   console.log(`[SYNC-INBOX] SSL/TLS enabled: ${account.use_ssl}`);
   console.log(`[SYNC-INBOX] Username: ${account.imap_username}`);
   console.log(`[SYNC-INBOX] Password length: ${account.imap_password?.length || 0}`);
 
-  const client = new ImapFlow({
+  const baseConfig = {
     host: account.imap_host,
-    port: account.imap_port,
-    secure: account.use_ssl,
     auth: {
       user: account.imap_username,
       pass: account.imap_password,
@@ -38,19 +42,67 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
       warn: (obj: any) => console.warn('[IMAP-WARN]', obj.msg || obj),
       error: (obj: any) => console.error('[IMAP-ERROR]', obj.msg || obj),
     },
-    tls: {
-      rejectUnauthorized: false,
-      minVersion: 'TLSv1',
+  };
+
+  const configs = [
+    {
+      ...baseConfig,
+      port: account.imap_port,
+      secure: account.use_ssl,
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1',
+      },
+      disableAutoIdle: true,
+      name: 'SSL directo con TLSv1+'
     },
-    disableAutoIdle: true,
-  });
+    {
+      ...baseConfig,
+      port: 143,
+      secure: false,
+      requireTLS: true,
+      tls: {
+        rejectUnauthorized: false,
+      },
+      disableAutoIdle: true,
+      name: 'STARTTLS en puerto 143'
+    },
+    {
+      ...baseConfig,
+      port: account.imap_port,
+      secure: true,
+      tls: {
+        rejectUnauthorized: false,
+      },
+      disableAutoIdle: true,
+      name: 'SSL directo estándar'
+    },
+  ];
+
+  let client: ImapFlow | null = null;
+  let lastError: any = null;
+
+  for (const config of configs) {
+    try {
+      console.log(`[SYNC-INBOX] Intentando: ${config.name}`);
+      console.log(`[SYNC-INBOX] Puerto: ${config.port}, Secure: ${config.secure}`);
+      client = await tryImapConnection(config);
+      console.log(`[SYNC-INBOX] ✓ Conexión exitosa con: ${config.name}`);
+      break;
+    } catch (error) {
+      console.error(`[SYNC-INBOX] ❌ Falló ${config.name}:`, error.message);
+      lastError = error;
+      client = null;
+    }
+  }
+
+  if (!client) {
+    throw new Error(`No se pudo conectar con ninguna configuración. Último error: ${lastError?.message}`);
+  }
 
   let syncedCount = 0;
 
   try {
-    console.log('[SYNC-INBOX] Attempting connection...');
-    await client.connect();
-    console.log('[SYNC-INBOX] ✓ IMAP connection established');
     console.log('[SYNC-INBOX] Connection state:', client.authenticated ? 'authenticated' : 'not authenticated');
 
     const lock = await client.getMailboxLock('INBOX');
@@ -148,19 +200,16 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
     return syncedCount;
   } catch (error) {
     console.error('[SYNC-INBOX] ❌ IMAP error:', error.message);
-    console.error('[SYNC-INBOX] Error name:', error.name);
-    console.error('[SYNC-INBOX] Error code:', error.code);
-    console.error('[SYNC-INBOX] Full error:', JSON.stringify(error, null, 2));
 
     try {
-      if (client.usable) {
+      if (client && client.usable) {
         await client.logout();
       }
     } catch (e) {
       console.error('[SYNC-INBOX] Error during logout:', e.message);
     }
 
-    throw new Error(`IMAP connection failed: ${error.message}. Verifica las credenciales y configuración del servidor.`);
+    throw new Error(`IMAP error: ${error.message}`);
   }
 }
 
