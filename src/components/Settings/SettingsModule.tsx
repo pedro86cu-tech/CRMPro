@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-  Settings, Mail, Server, Globe, Shield, Save, CheckCircle, AlertCircle, Phone, TestTube
+  Settings, Mail, Server, Globe, Shield, Save, CheckCircle, AlertCircle, Phone, TestTube, Inbox
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,7 +10,7 @@ import { twilioService } from '../../lib/twilioService';
 export function SettingsModule() {
   const toast = useToast();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'smtp' | 'email' | 'general' | 'twilio'>('smtp');
+  const [activeTab, setActiveTab] = useState<'smtp' | 'email' | 'general' | 'twilio' | 'inbox'>('smtp');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
 
   const [smtpConfig, setSmtpConfig] = useState({
@@ -53,9 +53,26 @@ export function SettingsModule() {
     is_test_mode: false
   });
 
+  const [inboxConfig, setInboxConfig] = useState({
+    id: '',
+    email_address: '',
+    display_name: '',
+    imap_host: '',
+    imap_port: 993,
+    imap_username: '',
+    imap_password: '',
+    smtp_host: '',
+    smtp_port: 465,
+    smtp_username: '',
+    smtp_password: '',
+    use_ssl: true,
+    is_active: true
+  });
+
   useEffect(() => {
     loadSettings();
     loadTwilioConfig();
+    loadInboxConfig();
   }, []);
 
   const loadSettings = async () => {
@@ -83,6 +100,21 @@ export function SettingsModule() {
 
     if (data) {
       setTwilioConfig(data);
+    }
+  };
+
+  const loadInboxConfig = async () => {
+    if (!user?.id) return;
+
+    const { data } = await supabase
+      .from('email_accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (data) {
+      setInboxConfig(data);
     }
   };
 
@@ -198,13 +230,65 @@ export function SettingsModule() {
         setSaveStatus('error');
         toast.error(`Error al guardar: ${error.message}`);
       } else {
-        // Limpiar caché del servicio de Twilio para forzar recarga
         twilioService.clearConfig();
 
         setSaveStatus('success');
         toast.success('Configuración de Twilio guardada correctamente');
         setTimeout(() => setSaveStatus('idle'), 2000);
         await loadTwilioConfig();
+      }
+    } catch (err) {
+      setSaveStatus('error');
+      toast.error('Error inesperado al guardar');
+    }
+  };
+
+  const handleSaveInbox = async () => {
+    setSaveStatus('saving');
+
+    try {
+      if (!user?.id) {
+        toast.error('Usuario no autenticado');
+        return;
+      }
+
+      const inboxData = {
+        user_id: user.id,
+        email_address: inboxConfig.email_address,
+        display_name: inboxConfig.display_name,
+        imap_host: inboxConfig.imap_host,
+        imap_port: inboxConfig.imap_port,
+        imap_username: inboxConfig.imap_username,
+        imap_password: inboxConfig.imap_password,
+        smtp_host: inboxConfig.smtp_host,
+        smtp_port: inboxConfig.smtp_port,
+        smtp_username: inboxConfig.smtp_username,
+        smtp_password: inboxConfig.smtp_password,
+        use_ssl: inboxConfig.use_ssl,
+        is_active: inboxConfig.is_active
+      };
+
+      let error;
+
+      if (inboxConfig.id) {
+        ({ error } = await supabase
+          .from('email_accounts')
+          .update(inboxData)
+          .eq('id', inboxConfig.id));
+      } else {
+        ({ error } = await supabase
+          .from('email_accounts')
+          .insert(inboxData));
+      }
+
+      if (error) {
+        setSaveStatus('error');
+        toast.error(`Error al guardar: ${error.message}`);
+      } else {
+        setSaveStatus('success');
+        toast.success('Configuración de buzón guardada correctamente');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+        await loadInboxConfig();
       }
     } catch (err) {
       setSaveStatus('error');
@@ -265,6 +349,17 @@ export function SettingsModule() {
         >
           <Mail className="w-5 h-5" />
           <span>Email</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('inbox')}
+          className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition ${
+            activeTab === 'inbox'
+              ? 'bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg'
+              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <Inbox className="w-5 h-5" />
+          <span>Buzón Personal</span>
         </button>
         <button
           onClick={() => setActiveTab('twilio')}
@@ -555,6 +650,247 @@ export function SettingsModule() {
               >
                 <Save className="w-5 h-5" />
                 <span>Guardar Configuración General</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'inbox' && (
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="bg-orange-100 p-3 rounded-lg">
+              <Inbox className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">Configuración del Buzón Personal</h2>
+              <p className="text-slate-600">Conecta tu cuenta de correo para recibir y enviar emails</p>
+            </div>
+          </div>
+
+          <div className="space-y-6 mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-semibold mb-1">Información importante:</p>
+                  <ul className="list-disc list-inside space-y-1 text-blue-700">
+                    <li>Esta configuración es independiente del SMTP de campañas</li>
+                    <li>Permite gestionar tu buzón personal dentro del CRM</li>
+                    <li>Soporta protocolos IMAP y SMTP estándar</li>
+                    <li>Las credenciales se almacenan de forma segura</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Mail className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-orange-800">
+                  <p className="font-semibold mb-1">Proveedores populares:</p>
+                  <div className="grid grid-cols-2 gap-2 mt-2 text-orange-700">
+                    <div>
+                      <p className="font-medium">Gmail:</p>
+                      <p className="text-xs">IMAP: imap.gmail.com:993</p>
+                      <p className="text-xs">SMTP: smtp.gmail.com:465</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Outlook:</p>
+                      <p className="text-xs">IMAP: outlook.office365.com:993</p>
+                      <p className="text-xs">SMTP: smtp.office365.com:587</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">Información de la Cuenta</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Dirección de Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={inboxConfig.email_address}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, email_address: e.target.value })}
+                    placeholder="tu-email@ejemplo.com"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Nombre para Mostrar
+                  </label>
+                  <input
+                    type="text"
+                    value={inboxConfig.display_name}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, display_name: e.target.value })}
+                    placeholder="Tu Nombre"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">Configuración IMAP (Recepción)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Servidor IMAP *
+                  </label>
+                  <input
+                    type="text"
+                    value={inboxConfig.imap_host}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, imap_host: e.target.value })}
+                    placeholder="imap.gmail.com"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Puerto IMAP *
+                  </label>
+                  <input
+                    type="number"
+                    value={inboxConfig.imap_port}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, imap_port: parseInt(e.target.value) })}
+                    placeholder="993"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Usuario IMAP *
+                  </label>
+                  <input
+                    type="text"
+                    value={inboxConfig.imap_username}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, imap_username: e.target.value })}
+                    placeholder="tu-email@ejemplo.com"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Contraseña IMAP *
+                  </label>
+                  <input
+                    type="password"
+                    value={inboxConfig.imap_password}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, imap_password: e.target.value })}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">Configuración SMTP (Envío)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Servidor SMTP *
+                  </label>
+                  <input
+                    type="text"
+                    value={inboxConfig.smtp_host}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, smtp_host: e.target.value })}
+                    placeholder="smtp.gmail.com"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Puerto SMTP *
+                  </label>
+                  <input
+                    type="number"
+                    value={inboxConfig.smtp_port}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, smtp_port: parseInt(e.target.value) })}
+                    placeholder="465"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Usuario SMTP *
+                  </label>
+                  <input
+                    type="text"
+                    value={inboxConfig.smtp_username}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, smtp_username: e.target.value })}
+                    placeholder="tu-email@ejemplo.com"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Contraseña SMTP *
+                  </label>
+                  <input
+                    type="password"
+                    value={inboxConfig.smtp_password}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, smtp_password: e.target.value })}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">Opciones</h3>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={inboxConfig.use_ssl}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, use_ssl: e.target.checked })}
+                    className="w-5 h-5 text-orange-600 border-slate-300 rounded focus:ring-2 focus:ring-orange-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-slate-700">Usar SSL/TLS</span>
+                    <p className="text-xs text-slate-500">Conexión segura cifrada (recomendado)</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={inboxConfig.is_active}
+                    onChange={(e) => setInboxConfig({ ...inboxConfig, is_active: e.target.checked })}
+                    className="w-5 h-5 text-orange-600 border-slate-300 rounded focus:ring-2 focus:ring-orange-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-slate-700">Cuenta Activa</span>
+                    <p className="text-xs text-slate-500">Habilita esta cuenta para usar en el buzón</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <button
+                onClick={handleSaveInbox}
+                disabled={saveStatus === 'saving'}
+                className="flex items-center space-x-2 bg-gradient-to-r from-orange-600 to-orange-500 text-white px-6 py-3 rounded-lg hover:from-orange-700 hover:to-orange-600 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-5 h-5" />
+                <span>Guardar Configuración</span>
               </button>
             </div>
           </div>
