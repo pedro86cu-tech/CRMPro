@@ -33,7 +33,7 @@ export function LoginForm() {
             Bienvenido de vuelta
           </h1>
           <p className="text-xl text-blue-100">
-            Accede a tu cuenta y gestiona tus reservas y negocio de forma segura y eficiente.
+            Accede a tu cuenta y gestiona tus clientes, ventas y operaciones de forma segura y eficiente.
           </p>
 
           <div className="space-y-4 mt-12">
@@ -63,7 +63,7 @@ export function LoginForm() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white mb-1">Gestión Unificada</h3>
-                <p className="text-blue-100">Administra tanto tu negocio como tus reservas personales</p>
+                <p className="text-blue-100">Administra clientes, pedidos, campañas y tickets desde un solo lugar</p>
               </div>
             </div>
           </div>
