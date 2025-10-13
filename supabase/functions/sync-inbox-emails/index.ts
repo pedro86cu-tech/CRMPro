@@ -236,7 +236,7 @@ serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: accounts, error: accountsError } = await supabase
-      .from('inbox_email_accounts')
+      .from('email_accounts')
       .select('*')
       .eq('created_by', userId)
       .eq('is_active', true);
