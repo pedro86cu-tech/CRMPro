@@ -12,15 +12,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log('[SEND-EMAIL] Request received');
+    console.log('[SEND-EMAIL] ========== REQUEST RECEIVED ==========');
+    console.log('[SEND-EMAIL] Timestamp:', new Date().toISOString());
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    console.log('[SEND-EMAIL] Supabase URL:', supabaseUrl);
+    console.log('[SEND-EMAIL] Service Key present:', !!supabaseServiceKey);
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('[SEND-EMAIL] Supabase client created successfully');
 
     const authHeader = req.headers.get('Authorization');
+    console.log('[SEND-EMAIL] Authorization header present:', !!authHeader);
+
     if (!authHeader) {
-      console.error('[SEND-EMAIL] No authorization header');
+      console.error('[SEND-EMAIL] ❌ No authorization header');
       return new Response(
         JSON.stringify({ error: 'No autorizado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -39,9 +47,14 @@ Deno.serve(async (req: Request) => {
       forward_from_id
     } = await req.json();
 
-    console.log(`[SEND-EMAIL] Sending email for user: ${userId}`);
+    console.log(`[SEND-EMAIL] ✓ Sending email for user: ${userId}`);
     console.log(`[SEND-EMAIL] To: ${to_emails.join(', ')}`);
     console.log(`[SEND-EMAIL] Subject: ${subject}`);
+    console.log(`[SEND-EMAIL] CC: ${cc_emails?.join(', ') || 'none'}`);
+    console.log(`[SEND-EMAIL] BCC: ${bcc_emails?.join(', ') || 'none'}`);
+
+    console.log('[SEND-EMAIL] Querying email_accounts table...');
+    console.log('[SEND-EMAIL] Query params: created_by =', userId, ', is_active = true');
 
     const { data: account, error: accountError } = await supabase
       .from('email_accounts')
@@ -51,22 +64,25 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (accountError) {
-      console.error('[SEND-EMAIL] Error fetching account:', accountError);
+      console.error('[SEND-EMAIL] ❌ Error fetching account:', accountError);
+      console.error('[SEND-EMAIL] Error details:', JSON.stringify(accountError, null, 2));
       throw accountError;
     }
 
     if (!account) {
-      console.error('[SEND-EMAIL] No active email account found');
+      console.error('[SEND-EMAIL] ❌ No active email account found');
       return new Response(
         JSON.stringify({ error: 'No hay cuenta de correo configurada' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[SEND-EMAIL] Using account: ${account.email_address}`);
+    console.log(`[SEND-EMAIL] ✓ Using account: ${account.email_address}`);
+    console.log(`[SEND-EMAIL] Account ID: ${account.id}`);
     console.log(`[SEND-EMAIL] SMTP: ${account.smtp_host}:${account.smtp_port}`);
+    console.log(`[SEND-EMAIL] Display name: ${account.display_name || 'none'}`);
 
-    console.log('[SEND-EMAIL] Simulating SMTP send (MOCK)');
+    console.log('[SEND-EMAIL] ⚠ Simulating SMTP send (MOCK MODE)');
 
     const sentEmail = {
       account_id: account.id,
@@ -92,7 +108,10 @@ Deno.serve(async (req: Request) => {
     };
 
     console.log('[SEND-EMAIL] Saving to sent folder in database');
-    console.log('[SEND-EMAIL] Email data:', sentEmail);
+    console.log('[SEND-EMAIL] Message ID:', sentEmail.message_id);
+    console.log('[SEND-EMAIL] Folder:', sentEmail.folder);
+    console.log('[SEND-EMAIL] User ID:', sentEmail.user_id);
+    console.log('[SEND-EMAIL] Account ID:', sentEmail.account_id);
 
     const { data: savedEmail, error: insertError } = await supabase
       .from('inbox_emails')
@@ -101,22 +120,30 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (insertError) {
-      console.error('[SEND-EMAIL] Error saving sent email:', insertError);
+      console.error('[SEND-EMAIL] ❌ Error saving sent email:', insertError);
+      console.error('[SEND-EMAIL] Error code:', insertError.code);
+      console.error('[SEND-EMAIL] Error message:', insertError.message);
       console.error('[SEND-EMAIL] Error details:', JSON.stringify(insertError, null, 2));
       throw insertError;
     }
 
-    console.log(`[SEND-EMAIL] Email saved to sent folder with ID: ${savedEmail.id}`);
+    console.log(`[SEND-EMAIL] ✓ Email saved to sent folder with ID: ${savedEmail.id}`);
 
     if (reply_to_id) {
       console.log(`[SEND-EMAIL] Marking original email ${reply_to_id} as read`);
-      await supabase
+      const { error: updateError } = await supabase
         .from('inbox_emails')
         .update({ is_read: true })
         .eq('id', reply_to_id);
+
+      if (updateError) {
+        console.error('[SEND-EMAIL] ❌ Error marking original as read:', updateError);
+      } else {
+        console.log('[SEND-EMAIL] ✓ Original email marked as read');
+      }
     }
 
-    console.log('[SEND-EMAIL] Email sent successfully');
+    console.log('[SEND-EMAIL] ✓ Email sent successfully');
 
     return new Response(
       JSON.stringify({

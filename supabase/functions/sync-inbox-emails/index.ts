@@ -12,15 +12,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log('[SYNC-INBOX] Request received');
+    console.log('[SYNC-INBOX] ========== REQUEST RECEIVED ==========');
+    console.log('[SYNC-INBOX] Timestamp:', new Date().toISOString());
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    console.log('[SYNC-INBOX] Supabase URL:', supabaseUrl);
+    console.log('[SYNC-INBOX] Service Key present:', !!supabaseServiceKey);
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('[SYNC-INBOX] Supabase client created successfully');
 
     const authHeader = req.headers.get('Authorization');
+    console.log('[SYNC-INBOX] Authorization header present:', !!authHeader);
+
     if (!authHeader) {
-      console.error('[SYNC-INBOX] No authorization header');
+      console.error('[SYNC-INBOX] ❌ No authorization header');
       return new Response(
         JSON.stringify({ error: 'No autorizado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -28,7 +36,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const { userId } = await req.json();
-    console.log(`[SYNC-INBOX] Syncing emails for user: ${userId}`);
+    console.log(`[SYNC-INBOX] ✓ Syncing emails for user: ${userId}`);
+
+    console.log('[SYNC-INBOX] Querying email_accounts table...');
+    console.log('[SYNC-INBOX] Query params: created_by =', userId, ', is_active = true');
 
     const { data: accounts, error: accountError } = await supabase
       .from('email_accounts')
@@ -37,9 +48,13 @@ Deno.serve(async (req: Request) => {
       .eq('is_active', true);
 
     if (accountError) {
-      console.error('[SYNC-INBOX] Error fetching accounts:', accountError);
+      console.error('[SYNC-INBOX] ❌ Error fetching accounts:', accountError);
+      console.error('[SYNC-INBOX] Error details:', JSON.stringify(accountError, null, 2));
       throw accountError;
     }
+
+    console.log('[SYNC-INBOX] ✓ Database query successful');
+    console.log('[SYNC-INBOX] Accounts found:', accounts?.length || 0);
 
     if (!accounts || accounts.length === 0) {
       console.log('[SYNC-INBOX] No active email accounts found');
@@ -63,9 +78,11 @@ Deno.serve(async (req: Request) => {
       try {
         console.log(`[SYNC-INBOX] Connecting to IMAP: ${account.imap_host}:${account.imap_port}`);
 
+        const accountEmailDomain = account.email_address.split('@')[1];
+
         const mockEmails = [
           {
-            message_id: `<mock-${Date.now()}-1@example.com>`,
+            message_id: `<mock-email-1@${accountEmailDomain}>`,
             thread_id: null,
             from_email: 'sender1@example.com',
             from_name: 'Test Sender 1',
@@ -85,7 +102,7 @@ Deno.serve(async (req: Request) => {
             email_date: new Date().toISOString(),
           },
           {
-            message_id: `<mock-${Date.now()}-2@example.com>`,
+            message_id: `<mock-email-2@${accountEmailDomain}>`,
             thread_id: null,
             from_email: 'sender2@example.com',
             from_name: 'Test Sender 2',
@@ -109,13 +126,20 @@ Deno.serve(async (req: Request) => {
         console.log(`[SYNC-INBOX] Found ${mockEmails.length} new email(s) (MOCK DATA)`);
 
         for (const email of mockEmails) {
-          const { data: existing } = await supabase
+          console.log(`[SYNC-INBOX] Checking if email exists: ${email.message_id}`);
+
+          const { data: existing, error: checkError } = await supabase
             .from('inbox_emails')
             .select('id')
             .eq('message_id', email.message_id)
             .maybeSingle();
 
+          if (checkError) {
+            console.error(`[SYNC-INBOX] ❌ Error checking existing email:`, checkError);
+          }
+
           if (!existing) {
+            console.log(`[SYNC-INBOX] ✓ Email does not exist, will insert`);
             const emailToInsert = {
               ...email,
               account_id: account.id,
@@ -130,15 +154,17 @@ Deno.serve(async (req: Request) => {
               .select();
 
             if (insertError) {
-              console.error(`[SYNC-INBOX] Error inserting email ${email.message_id}:`, insertError);
+              console.error(`[SYNC-INBOX] ❌ Error inserting email ${email.message_id}:`, insertError);
+              console.error(`[SYNC-INBOX] Error code:`, insertError.code);
+              console.error(`[SYNC-INBOX] Error message:`, insertError.message);
               console.error(`[SYNC-INBOX] Error details:`, JSON.stringify(insertError, null, 2));
             } else {
-              console.log(`[SYNC-INBOX] Successfully inserted email: ${email.subject}`);
-              console.log(`[SYNC-INBOX] Inserted data:`, inserted);
+              console.log(`[SYNC-INBOX] ✓ Successfully inserted email: ${email.subject}`);
+              console.log(`[SYNC-INBOX] Email ID: ${inserted?.[0]?.id}`);
               totalSynced++;
             }
           } else {
-            console.log(`[SYNC-INBOX] Email already exists: ${email.message_id}`);
+            console.log(`[SYNC-INBOX] ⊘ Email already exists, skipping: ${email.message_id}`);
           }
         }
 
