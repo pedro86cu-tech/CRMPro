@@ -5,7 +5,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey, X-User-Token, X-User-Id',
 };
 
 interface EmailAccount {
@@ -26,7 +26,7 @@ async function tryImapConnection(config: any): Promise<ImapFlow> {
 }
 
 async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supabase: any): Promise<number> {
-  console.log(`[SYNC-INBOX] =� Connecting to IMAP: ${account.imap_host}:${account.imap_port}`);
+  console.log(`[SYNC-INBOX] Connecting to IMAP: ${account.imap_host}:${account.imap_port}`);
   console.log(`[SYNC-INBOX] SSL/TLS enabled: ${account.use_ssl}`);
   console.log(`[SYNC-INBOX] Username: ${account.imap_username}`);
   console.log(`[SYNC-INBOX] Password length: ${account.imap_password?.length || 0}`);
@@ -100,10 +100,10 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
       console.log(`[SYNC-INBOX] Puerto: ${config.port}, Secure: ${config.secure}, RequireTLS: ${config.requireTLS || false}`);
       console.log(`[SYNC-INBOX] Timeouts - Greeting: ${config.greetingTimeout || 'default'}, Socket: ${config.socketTimeout || 'default'}`);
       client = await tryImapConnection(config);
-      console.log(`[SYNC-INBOX]  Conexi�n exitosa con: ${config.name}`);
+      console.log(`[SYNC-INBOX] Conexion exitosa con: ${config.name}`);
       break;
     } catch (error) {
-      console.error(`[SYNC-INBOX] L Fall� ${config.name}:`, error.message);
+      console.error(`[SYNC-INBOX] Fallo ${config.name}:`, error.message);
       console.error(`[SYNC-INBOX] Error code:`, error.code);
       lastError = error;
       client = null;
@@ -112,7 +112,7 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
   }
 
   if (!client) {
-    throw new Error(`No se pudo conectar con ninguna configuraci�n. �ltimo error: ${lastError?.message}`);
+    throw new Error(`No se pudo conectar con ninguna configuracion. Ultimo error: ${lastError?.message}`);
   }
 
   let syncedCount = 0;
@@ -121,7 +121,7 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
     console.log('[SYNC-INBOX] Connection state:', client.authenticated ? 'authenticated' : 'not authenticated');
 
     const lock = await client.getMailboxLock('INBOX');
-    console.log(`[SYNC-INBOX]  INBOX opened. Total messages: ${client.mailbox.exists}`);
+    console.log(`[SYNC-INBOX] INBOX opened. Total messages: ${client.mailbox.exists}`);
 
     try {
       if (client.mailbox.exists === 0) {
@@ -184,7 +184,7 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
             console.error(`[SYNC-INBOX] Error inserting email ${messageId}:`, insertError);
           } else {
             syncedCount++;
-            console.log(`[SYNC-INBOX]  Synced email: ${emailData.subject}`);
+            console.log(`[SYNC-INBOX] Synced email: ${emailData.subject}`);
           }
         } catch (msgError) {
           console.error('[SYNC-INBOX] Error processing message:', msgError);
@@ -195,10 +195,10 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
     }
 
     await client.logout();
-    console.log(`[SYNC-INBOX]  Logged out. Total emails synced: ${syncedCount}`);
+    console.log(`[SYNC-INBOX] Logged out. Total emails synced: ${syncedCount}`);
 
   } catch (error) {
-    console.error('[SYNC-INBOX] L IMAP error:', error.message);
+    console.error('[SYNC-INBOX] IMAP error:', error.message);
 
     try {
       if (client && client.usable) {
@@ -223,29 +223,22 @@ serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    const userId = req.headers.get('X-User-Id');
+    if (!userId) {
+      throw new Error('Missing user ID header');
     }
+
+    console.log(`[SYNC-INBOX] Syncing emails for user: ${userId}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      throw new Error('Invalid authorization token');
-    }
-
-    console.log(`[SYNC-INBOX]  Syncing emails for user: ${user.id}`);
-
     const { data: accounts, error: accountsError } = await supabase
       .from('inbox_email_accounts')
       .select('*')
-      .eq('created_by', user.id)
+      .eq('created_by', userId)
       .eq('is_active', true);
 
     if (accountsError) {
@@ -261,11 +254,11 @@ serve(async (req: Request) => {
       for (const account of accounts) {
         try {
           console.log(`[SYNC-INBOX] Processing account: ${account.email_address}`);
-          const synced = await fetchEmailsFromIMAP(account, user.id, supabase);
+          const synced = await fetchEmailsFromIMAP(account, userId, supabase);
           totalSynced += synced;
         } catch (error) {
           const errorMsg = `Error syncing account ${account.email_address}: ${error.message}`;
-          console.error(`[SYNC-INBOX] L ${errorMsg}`);
+          console.error(`[SYNC-INBOX] ${errorMsg}`);
           errors.push(errorMsg);
         }
       }
@@ -288,7 +281,7 @@ serve(async (req: Request) => {
       }
     );
   } catch (error) {
-    console.error('[SYNC-INBOX] L IMAP error:', error.message);
+    console.error('[SYNC-INBOX] IMAP error:', error.message);
     console.error('[SYNC-INBOX] Full error:', JSON.stringify(error, null, 2));
     console.error('[SYNC-INBOX] Error name:', error.name);
     console.error('[SYNC-INBOX] Error code:', error.code);

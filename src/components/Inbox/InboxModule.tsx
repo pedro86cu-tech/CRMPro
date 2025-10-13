@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { externalAuth } from '../../lib/externalAuth';
 
 interface InboxEmail {
   id: string;
@@ -162,18 +163,21 @@ export function InboxModule() {
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
+      const externalToken = externalAuth.getStoredToken();
+      if (!externalToken) {
         throw new Error('No hay sesión activa');
       }
 
-      console.log('[INBOX] Calling sync-inbox-emails function with user token');
+      console.log('[INBOX] Calling sync-inbox-emails function with external auth token');
 
       const response = await fetch(`${supabaseUrl}/functions/v1/sync-inbox-emails`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'X-User-Token': externalToken,
+          'X-User-Id': user.id,
           'Content-Type': 'application/json',
         },
       });
