@@ -20,6 +20,9 @@ interface EmailAccount {
 
 async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supabase: any): Promise<number> {
   console.log(`[SYNC-INBOX] 📧 Connecting to IMAP: ${account.imap_host}:${account.imap_port}`);
+  console.log(`[SYNC-INBOX] SSL/TLS enabled: ${account.use_ssl}`);
+  console.log(`[SYNC-INBOX] Username: ${account.imap_username}`);
+  console.log(`[SYNC-INBOX] Password length: ${account.imap_password?.length || 0}`);
 
   const client = new ImapFlow({
     host: account.imap_host,
@@ -29,7 +32,12 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
       user: account.imap_username,
       pass: account.imap_password,
     },
-    logger: false,
+    logger: {
+      debug: (obj: any) => console.log('[IMAP-DEBUG]', obj.msg || obj),
+      info: (obj: any) => console.log('[IMAP-INFO]', obj.msg || obj),
+      warn: (obj: any) => console.warn('[IMAP-WARN]', obj.msg || obj),
+      error: (obj: any) => console.error('[IMAP-ERROR]', obj.msg || obj),
+    },
     tls: {
       rejectUnauthorized: false,
     },
@@ -38,8 +46,10 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
   let syncedCount = 0;
 
   try {
+    console.log('[SYNC-INBOX] Attempting connection...');
     await client.connect();
     console.log('[SYNC-INBOX] ✓ IMAP connection established');
+    console.log('[SYNC-INBOX] Connection state:', client.authenticated ? 'authenticated' : 'not authenticated');
 
     const lock = await client.getMailboxLock('INBOX');
     console.log(`[SYNC-INBOX] ✓ INBOX opened. Total messages: ${client.mailbox.exists}`);
@@ -136,12 +146,19 @@ async function fetchEmailsFromIMAP(account: EmailAccount, userId: string, supaba
     return syncedCount;
   } catch (error) {
     console.error('[SYNC-INBOX] ❌ IMAP error:', error.message);
+    console.error('[SYNC-INBOX] Error name:', error.name);
+    console.error('[SYNC-INBOX] Error code:', error.code);
+    console.error('[SYNC-INBOX] Full error:', JSON.stringify(error, null, 2));
+
     try {
-      await client.logout();
+      if (client.usable) {
+        await client.logout();
+      }
     } catch (e) {
-      // Ignore logout errors
+      console.error('[SYNC-INBOX] Error during logout:', e.message);
     }
-    throw error;
+
+    throw new Error(`IMAP connection failed: ${error.message}. Verifica las credenciales y configuración del servidor.`);
   }
 }
 
