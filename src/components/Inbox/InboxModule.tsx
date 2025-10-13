@@ -162,17 +162,20 @@ export function InboxModule() {
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      console.log('[INBOX] Calling sync-inbox-emails function');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No hay sesión activa');
+      }
+
+      console.log('[INBOX] Calling sync-inbox-emails function with user token');
 
       const response = await fetch(`${supabaseUrl}/functions/v1/sync-inbox-emails`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId: user.id })
       });
 
       const result = await response.json();
@@ -183,7 +186,7 @@ export function InboxModule() {
       }
 
       await loadEmails();
-      toast.success(result.message || 'Emails sincronizados correctamente');
+      toast.success(`${result.totalSynced || 0} emails sincronizados correctamente`);
     } catch (error: any) {
       console.error('[INBOX] Sync error:', error);
       toast.error(`Error al sincronizar: ${error.message}`);
