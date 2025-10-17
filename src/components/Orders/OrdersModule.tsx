@@ -51,6 +51,10 @@ interface Order {
   payment_status: 'unpaid' | 'partial' | 'paid';
   created_at: string;
   clients?: Client;
+  external_order_id?: string;
+  external_partner_id?: string;
+  payment_method?: string;
+  metadata?: any;
 }
 
 export function OrdersModule() {
@@ -610,7 +614,14 @@ export function OrdersModule() {
                       <div className="bg-emerald-100 p-2 rounded-lg">
                         <Package className="w-4 h-4 text-emerald-600" />
                       </div>
-                      <span className="font-semibold text-slate-900">{order.order_number}</span>
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-900">{order.order_number}</span>
+                        {order.external_order_id && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full w-fit mt-1">
+                            DogCatify
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="py-4 px-4">
@@ -1235,6 +1246,47 @@ export function OrdersModule() {
                   </div>
                 </div>
               </div>
+
+              {selectedOrder.external_order_id && (
+                <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center">
+                    <Package className="w-5 h-5 mr-2 text-blue-600" />
+                    Información de DogCatify
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm text-slate-600">ID de Orden Externa:</span>
+                      <p className="font-mono text-sm font-semibold text-slate-900 break-all">
+                        {selectedOrder.external_order_id}
+                      </p>
+                    </div>
+                    {selectedOrder.external_partner_id && (
+                      <div>
+                        <span className="text-sm text-slate-600">ID de Partner:</span>
+                        <p className="font-mono text-sm font-semibold text-slate-900 break-all">
+                          {selectedOrder.external_partner_id}
+                        </p>
+                      </div>
+                    )}
+                    {selectedOrder.payment_method && (
+                      <div>
+                        <span className="text-sm text-slate-600">Método de Pago:</span>
+                        <p className="font-semibold text-slate-900">
+                          {selectedOrder.payment_method}
+                        </p>
+                      </div>
+                    )}
+                    {selectedOrder.metadata && (
+                      <div className="md:col-span-2">
+                        <span className="text-sm text-slate-600">Datos Adicionales:</span>
+                        <pre className="mt-2 p-3 bg-slate-100 rounded-lg text-xs overflow-x-auto">
+                          {JSON.stringify(selectedOrder.metadata, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
                 <h3 className="font-bold text-slate-900 mb-4 flex items-center">
