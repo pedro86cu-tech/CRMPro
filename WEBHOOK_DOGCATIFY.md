@@ -37,6 +37,8 @@ Se dispara cuando se crea una nueva orden en DogCatify.
 
 **Acciones:**
 - Busca o crea el cliente basado en `customer_id`
+- Si el cliente existe, actualiza sus datos con la información del webhook
+- Si el cliente no existe, lo crea con los datos completos del objeto `customer`
 - Crea la orden en la tabla `orders`
 - Crea los items de la orden en la tabla `order_items`
 
@@ -63,41 +65,74 @@ Se dispara cuando se completa una orden.
 
 ## Estructura del Payload
 
+El webhook acepta el campo `action` o `event` para determinar el tipo de evento.
+
+**Payload con datos del cliente:**
+
 ```json
 {
-  "event": "order.created",
-  "order_id": "550e8400-e29b-41d4-a716-446655440000",
+  "success": true,
+  "action": "order.created",
   "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "partner_id": "uuid",
-    "customer_id": "uuid",
-    "status": "pending",
-    "total_amount": 5000,
-    "items": [
-      {
-        "product_id": "uuid",
-        "quantity": 2,
-        "price": 2500
+    "order": {
+      "id": "orden-uuid",
+      "partner_id": "partner-uuid",
+      "customer_id": "customer-uuid",
+      "status": "pending",
+      "total_amount": 150.00,
+      "order_type": "product",
+      "items": [
+        {
+          "product_id": "prod-123",
+          "quantity": 2,
+          "price": 75.00
+        }
+      ],
+      "payment_method": "mercadopago",
+      "payment_status": "pending",
+      "created_at": "2025-10-17T00:00:00Z",
+      "customer": {
+        "id": "customer-uuid",
+        "full_name": "Juan Pérez",
+        "email": "juan@example.com",
+        "phone": "+1234567890",
+        "address": "Calle Principal 123",
+        "city": "Buenos Aires",
+        "country": "Argentina"
       }
-    ],
-    "payment_method": "mercadopago",
-    "payment_status": "pending",
-    "created_at": "2025-10-17T10:00:00Z",
-    "updated_at": "2025-10-17T10:00:00Z"
-  },
-  "timestamp": "2025-10-17T10:00:00Z"
+    }
+  }
 }
 ```
 
 ## Mapeo de Datos
 
 ### Cliente
-- Si el cliente existe (basado en `customer_id`), se usa el existente
-- Si no existe, se crea un nuevo cliente con:
-  - `external_id`: customer_id de DogCatify
+
+**Si el cliente existe (basado en `customer_id`):**
+- Se usa el cliente existente
+- Si vienen datos del cliente en el webhook (`customer`), se actualizan:
+  - `contact_name`: customer.full_name
+  - `email`: customer.email
+  - `phone`: customer.phone
+  - `address`: customer.address
+  - `city`: customer.city
+  - `country`: customer.country
+
+**Si no existe, se crea un nuevo cliente:**
+- `external_id`: customer_id de DogCatify
+- `status`: "active"
+- `source`: "dogcatify"
+- Si vienen datos del cliente:
+  - `contact_name`: customer.full_name
+  - `company_name`: customer.full_name (fallback)
+  - `email`: customer.email
+  - `phone`: customer.phone
+  - `address`: customer.address
+  - `city`: customer.city
+  - `country`: customer.country
+- Si NO vienen datos del cliente:
   - `company_name`: "Cliente DogCatify {customer_id_corto}"
-  - `status`: "active"
-  - `source`: "dogcatify"
 
 ### Orden
 - `order_number`: Generado automáticamente como "DC-{timestamp}-{order_id_corto}"
@@ -137,27 +172,37 @@ curl -X POST https://satzkpynnuloncwgxeev.supabase.co/functions/v1/dogcatify-ord
   -H "Content-Type: application/json" \\
   -H "X-Dogcatify-Signature: tu_firma_hmac" \\
   -d '{
-    "event": "order.created",
-    "order_id": "test-123",
+    "success": true,
+    "action": "order.created",
     "data": {
-      "id": "test-123",
-      "partner_id": "partner-456",
-      "customer_id": "customer-789",
-      "status": "pending",
-      "total_amount": 1000,
-      "items": [
-        {
-          "product_id": "prod-001",
-          "quantity": 1,
-          "price": 1000
+      "order": {
+        "id": "test-123",
+        "partner_id": "partner-456",
+        "customer_id": "customer-789",
+        "status": "pending",
+        "total_amount": 1000,
+        "order_type": "product",
+        "items": [
+          {
+            "product_id": "prod-001",
+            "quantity": 1,
+            "price": 1000
+          }
+        ],
+        "payment_method": "mercadopago",
+        "payment_status": "pending",
+        "created_at": "2025-10-17T10:00:00Z",
+        "customer": {
+          "id": "customer-789",
+          "full_name": "Juan Pérez",
+          "email": "juan@example.com",
+          "phone": "+1234567890",
+          "address": "Calle Principal 123",
+          "city": "Buenos Aires",
+          "country": "Argentina"
         }
-      ],
-      "payment_method": "mercadopago",
-      "payment_status": "pending",
-      "created_at": "2025-10-17T10:00:00Z",
-      "updated_at": "2025-10-17T10:00:00Z"
-    },
-    "timestamp": "2025-10-17T10:00:00Z"
+      }
+    }
   }'
 ```
 
