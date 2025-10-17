@@ -82,7 +82,6 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // Validar que sea una petición POST
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({
@@ -102,7 +101,6 @@ Deno.serve(async (req: Request) => {
 
     const signature = req.headers.get("x-dogcatify-signature");
 
-    // Validar que haya contenido en el body
     const contentType = req.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
       return new Response(
@@ -136,14 +134,12 @@ Deno.serve(async (req: Request) => {
 
     console.log("Payload recibido:", JSON.stringify(rawPayload, null, 2));
 
-    // Extraer el evento y los datos
     const event = rawPayload.action || rawPayload.event;
     const payload: WebhookPayload = rawPayload;
 
     console.log("Evento/Acción:", event);
     console.log("Order ID:", payload.data?.order?.id);
 
-    // Verificar firma si está configurada
     if (signature && Deno.env.get("DOGCATIFY_WEBHOOK_SECRET")) {
       const isValid = await verifySignature(payload, signature);
       if (!isValid) {
@@ -163,7 +159,6 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Procesar según el tipo de evento
     switch (event) {
       case "order.created": {
         console.log("Procesando nueva orden...");
@@ -171,10 +166,8 @@ Deno.serve(async (req: Request) => {
         const orderData = payload.data.order;
         const customerData = orderData.customer;
 
-        // Buscar o crear el cliente basado en customer_id
         let clientId = null;
 
-        // Buscar cliente existente por external_id (customer_id de DogCatify)
         const { data: existingClient } = await supabase
           .from("clients")
           .select("id")
@@ -185,7 +178,6 @@ Deno.serve(async (req: Request) => {
           clientId = existingClient.id;
           console.log("✓ Cliente existente encontrado:", clientId);
 
-          // Actualizar datos del cliente si vienen en el webhook
           if (customerData) {
             const { error: updateError } = await supabase
               .from("clients")
@@ -205,14 +197,12 @@ Deno.serve(async (req: Request) => {
             }
           }
         } else {
-          // Crear nuevo cliente con los datos del webhook
           const clientInsertData: any = {
             external_id: orderData.customer_id,
             status: "active",
             source: "dogcatify"
           };
 
-          // Si vienen los datos del cliente, usarlos
           if (customerData) {
             clientInsertData.contact_name = customerData.full_name;
             clientInsertData.email = customerData.email;
@@ -220,9 +210,8 @@ Deno.serve(async (req: Request) => {
             clientInsertData.address = customerData.address;
             clientInsertData.city = customerData.city;
             clientInsertData.country = customerData.country;
-            clientInsertData.company_name = customerData.full_name; // Usar el nombre como company_name si no hay empresa
+            clientInsertData.company_name = customerData.full_name;
           } else {
-            // Fallback si no vienen datos del cliente
             clientInsertData.company_name = `Cliente DogCatify ${orderData.customer_id.substring(0, 8)}`;
           }
 
@@ -241,10 +230,8 @@ Deno.serve(async (req: Request) => {
           console.log("✓ Cliente creado:", clientId);
         }
 
-        // Generar número de orden único
         const orderNumber = `DC-${Date.now()}-${orderData.id.substring(0, 8)}`;
 
-        // Crear la orden
         const { data: order, error: orderError } = await supabase
           .from("orders")
           .insert({
@@ -269,7 +256,6 @@ Deno.serve(async (req: Request) => {
         
         console.log("✓ Orden creada:", order.id);
 
-        // Crear los items de la orden
         if (orderData.items && orderData.items.length > 0) {
           const orderItems = orderData.items.map((item) => ({
             order_id: order.id,
@@ -303,7 +289,6 @@ Deno.serve(async (req: Request) => {
 
         const orderData = payload.data.order;
 
-        // Buscar la orden por external_order_id
         const { data: existingOrder } = await supabase
           .from("orders")
           .select("id")
@@ -316,12 +301,27 @@ Deno.serve(async (req: Request) => {
             updated_at: new Date().toISOString()
           };
 
-          // Solo actualizar campos si están presentes en el webhook
           if (orderData.status) {
             updateData.status = orderData.status;
           }
           if (orderData.payment_status) {
-            updateData.payment_status = orderData.payment_status;
+            const paymentStatusMap: Record<string, string> = {
+              'confirmed': 'confirmed',
+              'paid': 'paid',
+              'unpaid': 'unpaid',
+              'pending': 'pending',
+              'processing': 'processing',
+              'partial': 'partial',
+              'refunded': 'refunded',
+              'cancelled': 'cancelled',
+              'approved': 'confirmed',
+              'completed': 'paid',
+              'failed': 'cancelled'
+            };
+
+            const mappedStatus = paymentStatusMap[orderData.payment_status.toLowerCase()] || orderData.payment_status;
+            updateData.payment_status = mappedStatus;
+            console.log(`Payment status mapeado: ${orderData.payment_status} -> ${mappedStatus}`);
           }
           if (orderData.total_amount !== undefined) {
             updateData.total_amount = orderData.total_amount;
