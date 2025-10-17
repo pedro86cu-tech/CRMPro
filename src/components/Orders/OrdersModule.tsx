@@ -1468,12 +1468,68 @@ export function OrdersModule() {
                       </div>
                     )}
                     {selectedOrder.metadata && (
-                      <div className="md:col-span-2">
-                        <span className="text-sm text-slate-600">Datos Adicionales:</span>
-                        <pre className="mt-2 p-3 bg-slate-100 rounded-lg text-xs overflow-x-auto">
-                          {JSON.stringify(selectedOrder.metadata, null, 2)}
-                        </pre>
-                      </div>
+                      <>
+                        {selectedOrder.metadata.customer && (
+                          <div className="md:col-span-2 bg-white rounded-lg p-4 border border-blue-100">
+                            <h4 className="font-semibold text-slate-900 mb-3 flex items-center">
+                              <User className="w-4 h-4 mr-2 text-blue-600" />
+                              Información del Cliente (DogCatify)
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                              {selectedOrder.metadata.customer.full_name && (
+                                <div>
+                                  <span className="text-slate-600">Nombre:</span>
+                                  <p className="font-semibold text-slate-900">{selectedOrder.metadata.customer.full_name}</p>
+                                </div>
+                              )}
+                              {selectedOrder.metadata.customer.email && (
+                                <div>
+                                  <span className="text-slate-600">Email:</span>
+                                  <p className="font-semibold text-slate-900">{selectedOrder.metadata.customer.email}</p>
+                                </div>
+                              )}
+                              {selectedOrder.metadata.customer.phone && (
+                                <div>
+                                  <span className="text-slate-600">Teléfono:</span>
+                                  <p className="font-semibold text-slate-900">{selectedOrder.metadata.customer.phone}</p>
+                                </div>
+                              )}
+                              {selectedOrder.metadata.customer.city && (
+                                <div>
+                                  <span className="text-slate-600">Ciudad:</span>
+                                  <p className="font-semibold text-slate-900">{selectedOrder.metadata.customer.city}</p>
+                                </div>
+                              )}
+                              {selectedOrder.metadata.customer.address && (
+                                <div className="md:col-span-2">
+                                  <span className="text-slate-600">Dirección:</span>
+                                  <p className="font-semibold text-slate-900">{selectedOrder.metadata.customer.address}</p>
+                                </div>
+                              )}
+                              {selectedOrder.metadata.customer.country && (
+                                <div>
+                                  <span className="text-slate-600">País:</span>
+                                  <p className="font-semibold text-slate-900">{selectedOrder.metadata.customer.country}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {selectedOrder.metadata.status && (
+                          <div className="bg-white rounded-lg p-4 border border-blue-100">
+                            <span className="text-sm text-slate-600">Estado Original (DogCatify):</span>
+                            <p className="font-semibold text-slate-900 mt-1">{selectedOrder.metadata.status}</p>
+                          </div>
+                        )}
+                        {selectedOrder.metadata.created_at && (
+                          <div className="bg-white rounded-lg p-4 border border-blue-100">
+                            <span className="text-sm text-slate-600">Fecha de Creación:</span>
+                            <p className="font-semibold text-slate-900 mt-1">
+                              {new Date(selectedOrder.metadata.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
