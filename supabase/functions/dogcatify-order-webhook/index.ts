@@ -301,12 +301,30 @@ Deno.serve(async (req: Request) => {
             updated_at: new Date().toISOString()
           };
 
+          // Mapear el STATUS de la orden (fulfillment/cumplimiento)
           if (orderData.status) {
-            updateData.status = orderData.status;
+            const orderStatusMap: Record<string, string> = {
+              'pending': 'pending',
+              'confirmed': 'confirmed',
+              'in_progress': 'in_progress',
+              'processing': 'processing',
+              'shipped': 'shipped',
+              'delivered': 'delivered',
+              'completed': 'completed',
+              'cancelled': 'cancelled',
+              'approved': 'confirmed',
+              'active': 'in_progress'
+            };
+
+            const mappedOrderStatus = orderStatusMap[orderData.status.toLowerCase()] || 'pending';
+            updateData.status = mappedOrderStatus;
+            console.log(`Order status mapeado: ${orderData.status} -> ${mappedOrderStatus}`);
           }
+
+          // Mapear el PAYMENT_STATUS (estado de pago)
           if (orderData.payment_status) {
             const paymentStatusMap: Record<string, string> = {
-              'confirmed': 'confirmed',
+              'confirmed': 'paid',      // ⭐ confirmed = pagado
               'paid': 'paid',
               'unpaid': 'unpaid',
               'pending': 'pending',
@@ -314,15 +332,22 @@ Deno.serve(async (req: Request) => {
               'partial': 'partial',
               'refunded': 'refunded',
               'cancelled': 'cancelled',
-              'approved': 'confirmed',
-              'completed': 'paid',
+              'approved': 'paid',       // approved = pagado
+              'completed': 'paid',      // completed = pagado
               'failed': 'cancelled'
             };
 
-            const mappedStatus = paymentStatusMap[orderData.payment_status.toLowerCase()] || orderData.payment_status;
-            updateData.payment_status = mappedStatus;
-            console.log(`Payment status mapeado: ${orderData.payment_status} -> ${mappedStatus}`);
+            const mappedPaymentStatus = paymentStatusMap[orderData.payment_status.toLowerCase()] || orderData.payment_status;
+            updateData.payment_status = mappedPaymentStatus;
+            console.log(`Payment status mapeado: ${orderData.payment_status} -> ${mappedPaymentStatus}`);
+
+            // Si el pago está confirmado/pagado, actualizar también el status de la orden
+            if (mappedPaymentStatus === 'paid') {
+              updateData.status = 'confirmed';
+              console.log('✓ Pago confirmado - Status de orden actualizado a "confirmed"');
+            }
           }
+
           if (orderData.total_amount !== undefined) {
             updateData.total_amount = orderData.total_amount;
           }
