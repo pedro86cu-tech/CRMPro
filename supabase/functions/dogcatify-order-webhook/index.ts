@@ -7,38 +7,59 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-Dogcatify-Signature",
 };
 
-interface CustomerData {
+interface DogCatifyCustomer {
   id: string;
-  full_name: string;
+  display_name: string;
   email: string;
   phone: string;
-  address: string;
-  city: string;
-  country: string;
+  calle: string;
+  numero: string;
+  barrio: string;
+  codigo_postal: string;
+  location?: any;
+}
+
+interface DogCatifyItem {
+  id: string;
+  name: string;
+  image?: string;
+  price: number;
+  quantity: number;
+  partnerId: string;
+  partnerName: string;
+}
+
+interface DogCatifyOrder {
+  id: string;
+  partner_id: string;
+  customer_id: string;
+  status: string;
+  payment_status: string | null;
+  payment_method: string;
+  total_amount: number;
+  partner_amount: number;
+  commission_amount: number;
+  order_type: string;
+  shipping_address: string;
+  created_at: string;
+  updated_at: string;
+  customer: DogCatifyCustomer;
+  items: DogCatifyItem[];
+  pet_id?: string | null;
+  booking_id?: string | null;
+  service_id?: string | null;
+  payment_id?: string | null;
+  payment_preference_id?: string | null;
+  booking_notes?: string | null;
+  appointment_date?: string | null;
+  appointment_time?: string | null;
 }
 
 interface WebhookPayload {
-  success: boolean;
-  data: {
-    order: {
-      id: string;
-      partner_id: string;
-      customer_id: string;
-      status: string;
-      total_amount: number;
-      order_type?: string;
-      items: Array<{
-        product_id: string;
-        quantity: number;
-        price: number;
-      }>;
-      payment_method: string;
-      payment_status: string;
-      created_at: string;
-      updated_at?: string;
-      customer?: CustomerData;
-    };
-  };
+  event: string;
+  order_id: string;
+  timestamp: string;
+  data: DogCatifyOrder;
 }
 
 async function verifySignature(payload: any, signature: string): Promise<boolean> {
@@ -134,11 +155,13 @@ Deno.serve(async (req: Request) => {
 
     console.log("Payload recibido:", JSON.stringify(rawPayload, null, 2));
 
-    const event = rawPayload.action || rawPayload.event;
     const payload: WebhookPayload = rawPayload;
+    const event = payload.event;
+    const orderData = payload.data;
 
-    console.log("Evento/Acción:", event);
-    console.log("Order ID:", payload.data?.order?.id);
+    console.log("Evento:", event);
+    console.log("Order ID:", payload.order_id);
+    console.log("Order Data:", JSON.stringify(orderData, null, 2));
 
     if (signature && Deno.env.get("DOGCATIFY_WEBHOOK_SECRET")) {
       const isValid = await verifySignature(payload, signature);
@@ -163,9 +186,7 @@ Deno.serve(async (req: Request) => {
       case "order.created": {
         console.log("Procesando nueva orden...");
 
-        const orderData = payload.data.order;
         const customerData = orderData.customer;
-
         let clientId = null;
 
         const { data: existingClient } = await supabase
@@ -178,42 +199,38 @@ Deno.serve(async (req: Request) => {
           clientId = existingClient.id;
           console.log("✓ Cliente existente encontrado:", clientId);
 
-          if (customerData) {
-            const { error: updateError } = await supabase
-              .from("clients")
-              .update({
-                contact_name: customerData.full_name,
-                email: customerData.email,
-                phone: customerData.phone,
-                address: customerData.address,
-                city: customerData.city,
-                country: customerData.country,
-                updated_at: new Date().toISOString()
-              })
-              .eq("id", clientId);
+          const fullAddress = `${customerData.calle} ${customerData.numero}, ${customerData.barrio}`;
+          const { error: updateError } = await supabase
+            .from("clients")
+            .update({
+              contact_name: customerData.display_name,
+              email: customerData.email,
+              phone: customerData.phone,
+              address: fullAddress,
+              city: customerData.barrio,
+              country: "Uruguay",
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", clientId);
 
-            if (!updateError) {
-              console.log("✓ Datos del cliente actualizados");
-            }
+          if (!updateError) {
+            console.log("✓ Datos del cliente actualizados");
           }
         } else {
+          const fullAddress = `${customerData.calle} ${customerData.numero}, ${customerData.barrio}`;
+
           const clientInsertData: any = {
             external_id: orderData.customer_id,
+            contact_name: customerData.display_name,
+            company_name: customerData.display_name,
+            email: customerData.email,
+            phone: customerData.phone,
+            address: fullAddress,
+            city: customerData.barrio,
+            country: "Uruguay",
             status: "active",
             source: "dogcatify"
           };
-
-          if (customerData) {
-            clientInsertData.contact_name = customerData.full_name;
-            clientInsertData.email = customerData.email;
-            clientInsertData.phone = customerData.phone;
-            clientInsertData.address = customerData.address;
-            clientInsertData.city = customerData.city;
-            clientInsertData.country = customerData.country;
-            clientInsertData.company_name = customerData.full_name;
-          } else {
-            clientInsertData.company_name = `Cliente DogCatify ${orderData.customer_id.substring(0, 8)}`;
-          }
 
           const { data: newClient, error: clientError } = await supabase
             .from("clients")
@@ -232,41 +249,54 @@ Deno.serve(async (req: Request) => {
 
         const orderNumber = `DC-${Date.now()}-${orderData.id.substring(0, 8)}`;
 
+        const subtotal = orderData.total_amount - orderData.commission_amount;
+        const shippingAddress = `${orderData.shipping_address || customerData.calle + ' ' + customerData.numero}`;
+
         const { data: order, error: orderError } = await supabase
           .from("orders")
           .insert({
             order_number: orderNumber,
             client_id: clientId,
-            status: orderData.status,
+            status: orderData.status || 'pending',
+            payment_status: orderData.payment_status || 'unpaid',
+            payment_method: orderData.payment_method || 'unknown',
             total_amount: orderData.total_amount,
-            payment_method: orderData.payment_method,
-            payment_status: orderData.payment_status,
+            subtotal: subtotal,
+            tax_amount: 0,
+            discount_amount: 0,
+            shipping_cost: 0,
+            shipping_address: shippingAddress,
+            billing_address: shippingAddress,
+            currency: 'UYU',
             external_order_id: orderData.id,
             external_partner_id: orderData.partner_id,
-            notes: `Orden importada desde DogCatify\nTipo: ${orderData.order_type || 'N/A'}\nMétodo de pago: ${orderData.payment_method}\nEstado de pago: ${orderData.payment_status}`,
-            metadata: orderData
+            notes: `Orden importada desde DogCatify (${orderData.items[0]?.partnerName || 'Partner'})\nTipo: ${orderData.order_type}\nMétodo de pago: ${orderData.payment_method}\nMonto partner: ${orderData.partner_amount}\nComisión: ${orderData.commission_amount}`,
+            metadata: orderData,
+            order_date: new Date(orderData.created_at).toISOString().split('T')[0]
           })
           .select()
           .single();
-        
+
         if (orderError) {
           console.error("Error creando orden:", orderError);
           throw orderError;
         }
-        
+
         console.log("✓ Orden creada:", order.id);
 
         if (orderData.items && orderData.items.length > 0) {
           const orderItems = orderData.items.map((item) => ({
             order_id: order.id,
-            product_name: item.product_id,
-            description: `Producto: ${item.product_id}`,
+            product_name: item.name,
+            description: `${item.name} - ${item.partnerName}`,
             quantity: item.quantity,
             unit_price: item.price,
             line_total: item.quantity * item.price,
             total_price: item.quantity * item.price,
-            external_product_id: item.product_id,
-            item_type: 'product'
+            discount_percent: 0,
+            external_product_id: item.id,
+            item_type: 'product',
+            notes: item.image ? `Imagen: ${item.image}` : ''
           }));
 
           const { error: itemsError } = await supabase
@@ -287,8 +317,6 @@ Deno.serve(async (req: Request) => {
       case "order.updated": {
         console.log("Procesando actualización de orden...");
 
-        const orderData = payload.data.order;
-
         const { data: existingOrder } = await supabase
           .from("orders")
           .select("id")
@@ -301,7 +329,6 @@ Deno.serve(async (req: Request) => {
             updated_at: new Date().toISOString()
           };
 
-          // Mapear el STATUS de la orden (fulfillment/cumplimiento)
           if (orderData.status) {
             const orderStatusMap: Record<string, string> = {
               'pending': 'pending',
@@ -321,10 +348,9 @@ Deno.serve(async (req: Request) => {
             console.log(`Order status mapeado: ${orderData.status} -> ${mappedOrderStatus}`);
           }
 
-          // Mapear el PAYMENT_STATUS (estado de pago)
           if (orderData.payment_status) {
             const paymentStatusMap: Record<string, string> = {
-              'confirmed': 'paid',      // ⭐ confirmed = pagado
+              'confirmed': 'paid',
               'paid': 'paid',
               'unpaid': 'unpaid',
               'pending': 'pending',
@@ -332,8 +358,8 @@ Deno.serve(async (req: Request) => {
               'partial': 'partial',
               'refunded': 'refunded',
               'cancelled': 'cancelled',
-              'approved': 'paid',       // approved = pagado
-              'completed': 'paid',      // completed = pagado
+              'approved': 'paid',
+              'completed': 'paid',
               'failed': 'cancelled'
             };
 
@@ -341,7 +367,6 @@ Deno.serve(async (req: Request) => {
             updateData.payment_status = mappedPaymentStatus;
             console.log(`Payment status mapeado: ${orderData.payment_status} -> ${mappedPaymentStatus}`);
 
-            // Si el pago está confirmado/pagado, actualizar también el status de la orden
             if (mappedPaymentStatus === 'paid') {
               updateData.status = 'confirmed';
               console.log('✓ Pago confirmado - Status de orden actualizado a "confirmed"');
@@ -377,8 +402,6 @@ Deno.serve(async (req: Request) => {
       case "order.cancelled": {
         console.log("Procesando cancelación de orden...");
 
-        const orderData = payload.data.order;
-
         const { data: existingOrder } = await supabase
           .from("orders")
           .select("id")
@@ -408,8 +431,6 @@ Deno.serve(async (req: Request) => {
 
       case "order.completed": {
         console.log("Procesando completación de orden...");
-
-        const orderData = payload.data.order;
 
         const { data: existingOrder } = await supabase
           .from("orders")
@@ -447,7 +468,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         received: true,
         success: true,
-        order_id: payload.data?.order?.id
+        order_id: payload.order_id
       }),
       {
         status: 200,
