@@ -297,6 +297,7 @@ Deno.serve(async (req: Request) => {
         break;
       }
 
+      case "order.update":
       case "order.updated": {
         console.log("Procesando actualización de orden...");
 
@@ -310,15 +311,28 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (existingOrder) {
+          const updateData: any = {
+            metadata: orderData,
+            updated_at: new Date().toISOString()
+          };
+
+          // Solo actualizar campos si están presentes en el webhook
+          if (orderData.status) {
+            updateData.status = orderData.status;
+          }
+          if (orderData.payment_status) {
+            updateData.payment_status = orderData.payment_status;
+          }
+          if (orderData.total_amount !== undefined) {
+            updateData.total_amount = orderData.total_amount;
+          }
+          if (orderData.payment_method) {
+            updateData.payment_method = orderData.payment_method;
+          }
+
           const { error: updateError } = await supabase
             .from("orders")
-            .update({
-              status: orderData.status,
-              payment_status: orderData.payment_status,
-              total_amount: orderData.total_amount,
-              metadata: orderData,
-              updated_at: new Date().toISOString()
-            })
+            .update(updateData)
             .eq("id", existingOrder.id);
 
           if (updateError) {
@@ -327,10 +341,11 @@ Deno.serve(async (req: Request) => {
           }
 
           console.log("✓ Orden actualizada:", existingOrder.id);
+          console.log("Campos actualizados:", updateData);
         } else {
           console.warn("Orden no encontrada para actualizar:", orderData.id);
         }
-        
+
         break;
       }
 
