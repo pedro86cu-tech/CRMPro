@@ -61,6 +61,7 @@ export function OrdersModule() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedOrderItems, setSelectedOrderItems] = useState<OrderItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,6 +70,7 @@ export function OrdersModule() {
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [editFormData, setEditFormData] = useState<any>(null);
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -402,6 +404,87 @@ export function OrdersModule() {
       toast.success('Link de pago copiado al portapapeles');
     } catch (error) {
       toast.error('Error al generar link de pago');
+    }
+  };
+
+  const openEditModal = async (order: Order) => {
+    setSelectedOrder(order);
+
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', order.id);
+
+    setSelectedOrderItems(items || []);
+
+    setEditFormData({
+      order_date: order.order_date,
+      due_date: order.due_date || '',
+      status: order.status,
+      payment_status: order.payment_status,
+      payment_method: order.payment_method || '',
+      payment_terms: order.payment_terms || '',
+      tax_rate: order.tax_rate,
+      discount_amount: order.discount_amount,
+      shipping_cost: order.shipping_cost,
+      currency: order.currency,
+      notes: order.notes || '',
+      customer_notes: order.customer_notes || '',
+      shipping_address: order.shipping_address || '',
+      billing_address: order.billing_address || ''
+    });
+
+    setShowEditModal(true);
+  };
+
+  const handleUpdateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedOrder) return;
+
+    try {
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          ...editFormData,
+          updated_by: user?.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedOrder.id);
+
+      if (orderError) {
+        toast.error(`Error al actualizar orden: ${orderError.message}`);
+        return;
+      }
+
+      toast.success('Orden actualizada correctamente');
+      setShowEditModal(false);
+      loadOrders();
+
+      if (showViewModal) {
+        const { data: updatedOrder } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            clients (
+              id,
+              company_name,
+              contact_name,
+              email,
+              address,
+              city,
+              country
+            )
+          `)
+          .eq('id', selectedOrder.id)
+          .single();
+
+        if (updatedOrder) {
+          setSelectedOrder(updatedOrder);
+        }
+      }
+    } catch (err) {
+      toast.error('Error inesperado al actualizar la orden');
     }
   };
 
@@ -1528,6 +1611,13 @@ export function OrdersModule() {
 
             <div className="flex justify-between items-center p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex-shrink-0">
               <button
+                onClick={() => openEditModal(selectedOrder)}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition shadow-lg font-semibold flex items-center gap-2"
+              >
+                <Edit2 className="w-5 h-5" />
+                Editar Orden
+              </button>
+              <button
                 onClick={() => generatePaymentLink(selectedOrder)}
                 className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition shadow-lg font-semibold flex items-center gap-2"
               >
@@ -1541,6 +1631,329 @@ export function OrdersModule() {
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && selectedOrder && editFormData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-2xl p-6 flex-shrink-0">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Edit2 className="w-7 h-7" />
+                    Editar Orden
+                  </h2>
+                  <p className="text-blue-100 text-sm mt-1">{selectedOrder.order_number}</p>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-white hover:bg-white/20 p-2 rounded-lg transition"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateOrder} className="p-6 space-y-6 overflow-y-auto flex-1">
+              <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+                <h3 className="font-bold text-slate-900 mb-4 flex items-center">
+                  <User className="w-5 h-5 mr-2 text-blue-600" />
+                  Información del Cliente
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-sm text-slate-600">Cliente:</span>
+                    <p className="font-semibold text-slate-900">
+                      {selectedOrder.clients?.company_name || selectedOrder.clients?.contact_name}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-slate-600">Email:</span>
+                    <p className="font-semibold text-slate-900">{selectedOrder.clients?.email}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                  <Calendar className="w-5 h-5 mr-2 text-amber-600" />
+                  Fechas
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Fecha de Orden
+                    </label>
+                    <input
+                      type="date"
+                      value={editFormData.order_date}
+                      onChange={(e) => setEditFormData({ ...editFormData, order_date: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Fecha de Entrega
+                    </label>
+                    <input
+                      type="date"
+                      value={editFormData.due_date}
+                      onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                  <Package className="w-5 h-5 mr-2 text-blue-600" />
+                  Estados
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Estado de la Orden
+                    </label>
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                      required
+                    >
+                      <option value="pending">Pendiente</option>
+                      <option value="confirmed">Confirmada</option>
+                      <option value="in_progress">En Progreso</option>
+                      <option value="processing">Procesando</option>
+                      <option value="shipped">Enviada</option>
+                      <option value="delivered">Entregada</option>
+                      <option value="completed">Completada</option>
+                      <option value="cancelled">Cancelada</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Estado de Pago
+                    </label>
+                    <select
+                      value={editFormData.payment_status}
+                      onChange={(e) => setEditFormData({ ...editFormData, payment_status: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                      required
+                    >
+                      <option value="unpaid">Sin Pagar</option>
+                      <option value="pending">Pendiente</option>
+                      <option value="processing">Procesando</option>
+                      <option value="partial">Parcial</option>
+                      <option value="paid">Pagado</option>
+                      <option value="refunded">Reembolsado</option>
+                      <option value="cancelled">Cancelado</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                  <CreditCard className="w-5 h-5 mr-2 text-emerald-600" />
+                  Información de Pago
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Método de Pago
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.payment_method}
+                      onChange={(e) => setEditFormData({ ...editFormData, payment_method: e.target.value })}
+                      placeholder="ej: Mercado Pago, Stripe, Transferencia"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Términos de Pago
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.payment_terms}
+                      onChange={(e) => setEditFormData({ ...editFormData, payment_terms: e.target.value })}
+                      placeholder="ej: Net 30, Inmediato"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                  <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+                  Costos Adicionales
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Tasa de Impuesto (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editFormData.tax_rate}
+                      onChange={(e) => setEditFormData({ ...editFormData, tax_rate: parseFloat(e.target.value) })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Descuento ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editFormData.discount_amount}
+                      onChange={(e) => setEditFormData({ ...editFormData, discount_amount: parseFloat(e.target.value) })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Costo de Envío ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editFormData.shipping_cost}
+                      onChange={(e) => setEditFormData({ ...editFormData, shipping_cost: parseFloat(e.target.value) })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Moneda
+                    </label>
+                    <select
+                      value={editFormData.currency}
+                      onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    >
+                      <option value="USD">USD - Dólar</option>
+                      <option value="EUR">EUR - Euro</option>
+                      <option value="MXN">MXN - Peso Mexicano</option>
+                      <option value="COP">COP - Peso Colombiano</option>
+                      <option value="ARS">ARS - Peso Argentino</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                  <MapPin className="w-5 h-5 mr-2 text-red-600" />
+                  Direcciones
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Dirección de Envío
+                    </label>
+                    <textarea
+                      value={editFormData.shipping_address}
+                      onChange={(e) => setEditFormData({ ...editFormData, shipping_address: e.target.value })}
+                      rows={3}
+                      placeholder="Dirección completa de envío"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Dirección de Facturación
+                    </label>
+                    <textarea
+                      value={editFormData.billing_address}
+                      onChange={(e) => setEditFormData({ ...editFormData, billing_address: e.target.value })}
+                      rows={3}
+                      placeholder="Dirección completa de facturación"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                  <FileText className="w-5 h-5 mr-2 text-slate-600" />
+                  Notas
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Notas Internas
+                    </label>
+                    <textarea
+                      value={editFormData.notes}
+                      onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                      rows={4}
+                      placeholder="Notas internas sobre la orden"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Notas del Cliente
+                    </label>
+                    <textarea
+                      value={editFormData.customer_notes}
+                      onChange={(e) => setEditFormData({ ...editFormData, customer_notes: e.target.value })}
+                      rows={4}
+                      placeholder="Notas del cliente o instrucciones especiales"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {selectedOrder.external_order_id && (
+                <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+                  <h3 className="font-bold text-slate-900 mb-3 flex items-center">
+                    <Package className="w-5 h-5 mr-2 text-blue-600" />
+                    Información de DogCatify
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-600">ID de Orden Externa:</span>
+                      <p className="font-mono font-semibold text-slate-900">{selectedOrder.external_order_id}</p>
+                    </div>
+                    {selectedOrder.external_partner_id && (
+                      <div>
+                        <span className="text-slate-600">ID de Partner:</span>
+                        <p className="font-mono font-semibold text-slate-900">{selectedOrder.external_partner_id}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-4 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-6 py-3 border-2 border-slate-300 text-slate-700 rounded-xl hover:bg-slate-100 transition font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition shadow-lg font-semibold flex items-center gap-2"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
