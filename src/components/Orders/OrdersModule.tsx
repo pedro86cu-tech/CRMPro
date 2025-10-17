@@ -33,7 +33,7 @@ interface Order {
   id: string;
   order_number: string;
   client_id: string;
-  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'in_progress' | 'processing' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
   order_date: string;
   due_date: string | null;
   subtotal: number;
@@ -48,7 +48,7 @@ interface Order {
   shipping_address: string;
   billing_address: string;
   payment_terms: string;
-  payment_status: 'unpaid' | 'partial' | 'paid';
+  payment_status: 'unpaid' | 'pending' | 'processing' | 'partial' | 'paid' | 'refunded' | 'cancelled';
   created_at: string;
   clients?: Client;
   external_order_id?: string;
@@ -96,6 +96,7 @@ export function OrdersModule() {
     billing_address: '',
     payment_terms: 'Net 30',
     payment_status: 'unpaid' as const,
+    payment_method: '',
     status: 'pending' as const
   });
 
@@ -314,6 +315,7 @@ export function OrdersModule() {
       billing_address: '',
       payment_terms: 'Net 30',
       payment_status: 'unpaid',
+      payment_method: '',
       status: 'pending'
     });
     setClientSearch('');
@@ -414,6 +416,9 @@ export function OrdersModule() {
       case 'pending': return <Clock className="w-4 h-4" />;
       case 'confirmed': return <CheckCircle className="w-4 h-4" />;
       case 'in_progress': return <Package className="w-4 h-4" />;
+      case 'processing': return <Package className="w-4 h-4" />;
+      case 'shipped': return <Truck className="w-4 h-4" />;
+      case 'delivered': return <CheckCircle className="w-4 h-4" />;
       case 'completed': return <CheckCircle className="w-4 h-4" />;
       case 'cancelled': return <XCircle className="w-4 h-4" />;
       default: return <AlertCircle className="w-4 h-4" />;
@@ -425,6 +430,9 @@ export function OrdersModule() {
       case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
       case 'confirmed': return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'in_progress': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'processing': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'shipped': return 'bg-cyan-50 text-cyan-700 border-cyan-200';
+      case 'delivered': return 'bg-teal-50 text-teal-700 border-teal-200';
       case 'completed': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
       default: return 'bg-slate-50 text-slate-700 border-slate-200';
@@ -436,9 +444,38 @@ export function OrdersModule() {
       case 'pending': return 'Pendiente';
       case 'confirmed': return 'Confirmada';
       case 'in_progress': return 'En Progreso';
+      case 'processing': return 'Procesando';
+      case 'shipped': return 'Enviada';
+      case 'delivered': return 'Entregada';
       case 'completed': return 'Completada';
       case 'cancelled': return 'Cancelada';
       default: return status;
+    }
+  };
+
+  const getPaymentStatusLabel = (status: string) => {
+    switch (status) {
+      case 'unpaid': return 'Sin Pagar';
+      case 'pending': return 'Pendiente';
+      case 'processing': return 'Procesando';
+      case 'partial': return 'Parcial';
+      case 'paid': return 'Pagado';
+      case 'refunded': return 'Reembolsado';
+      case 'cancelled': return 'Cancelado';
+      default: return status;
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'unpaid': return 'bg-red-50 text-red-700 border-red-200';
+      case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'processing': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'partial': return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'paid': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'refunded': return 'bg-slate-50 text-slate-700 border-slate-200';
+      case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
+      default: return 'bg-slate-50 text-slate-700 border-slate-200';
     }
   };
 
@@ -847,7 +884,65 @@ export function OrdersModule() {
                     <option value="EUR">EUR - Euro</option>
                     <option value="MXN">MXN - Peso Mexicano</option>
                     <option value="COP">COP - Peso Colombiano</option>
+                    <option value="ARS">ARS - Peso Argentino</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    <Package className="w-4 h-4 inline mr-2 text-blue-600" />
+                    Estado de la Orden
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                  >
+                    <option value="pending">Pendiente</option>
+                    <option value="confirmed">Confirmada</option>
+                    <option value="in_progress">En Progreso</option>
+                    <option value="processing">Procesando</option>
+                    <option value="shipped">Enviada</option>
+                    <option value="delivered">Entregada</option>
+                    <option value="completed">Completada</option>
+                    <option value="cancelled">Cancelada</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    <DollarSign className="w-4 h-4 inline mr-2 text-green-600" />
+                    Estado de Pago
+                  </label>
+                  <select
+                    value={formData.payment_status}
+                    onChange={(e) => setFormData({ ...formData, payment_status: e.target.value as any })}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                  >
+                    <option value="unpaid">Sin Pagar</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="processing">Procesando</option>
+                    <option value="partial">Parcial</option>
+                    <option value="paid">Pagado</option>
+                    <option value="refunded">Reembolsado</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    <CreditCard className="w-4 h-4 inline mr-2 text-indigo-600" />
+                    Método de Pago
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.payment_method}
+                    onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                    placeholder="ej: Mercado Pago, Stripe, Transferencia"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                  />
                 </div>
               </div>
 
@@ -1205,16 +1300,20 @@ export function OrdersModule() {
                         <option value="pending">Pendiente</option>
                         <option value="confirmed">Confirmada</option>
                         <option value="in_progress">En Progreso</option>
+                        <option value="processing">Procesando</option>
+                        <option value="shipped">Enviada</option>
+                        <option value="delivered">Entregada</option>
                         <option value="completed">Completada</option>
                         <option value="cancelled">Cancelada</option>
                       </select>
                     </div>
                     <div>
                       <span className="text-sm text-slate-600">Estado de Pago:</span>
-                      <p className="font-semibold text-slate-900 mt-1">
-                        {selectedOrder.payment_status === 'paid' ? 'Pagado' :
-                         selectedOrder.payment_status === 'partial' ? 'Parcial' : 'Sin pagar'}
-                      </p>
+                      <div className="mt-1">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getPaymentStatusColor(selectedOrder.payment_status)}`}>
+                          {getPaymentStatusLabel(selectedOrder.payment_status)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1223,9 +1322,9 @@ export function OrdersModule() {
               <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
                 <h3 className="font-bold text-slate-900 mb-4 flex items-center">
                   <Calendar className="w-5 h-5 mr-2 text-amber-600" />
-                  Fechas
+                  Fechas y Pagos
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <span className="text-sm text-slate-600">Fecha de Orden:</span>
                     <p className="font-semibold text-slate-900">
@@ -1244,6 +1343,15 @@ export function OrdersModule() {
                     <span className="text-sm text-slate-600">Términos de Pago:</span>
                     <p className="font-semibold text-slate-900">{selectedOrder.payment_terms}</p>
                   </div>
+                  {selectedOrder.payment_method && (
+                    <div>
+                      <span className="text-sm text-slate-600 flex items-center">
+                        <CreditCard className="w-4 h-4 mr-1" />
+                        Método de Pago:
+                      </span>
+                      <p className="font-semibold text-slate-900">{selectedOrder.payment_method}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
