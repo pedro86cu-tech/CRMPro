@@ -82,11 +82,57 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // Validar que sea una petición POST
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({
+        error: "Method not allowed",
+        message: "Este endpoint solo acepta peticiones POST con un JSON válido en el body"
+      }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+
   try {
     console.log("=== WEBHOOK DOGCATIFY RECIBIDO ===");
+    console.log("Método:", req.method);
 
     const signature = req.headers.get("x-dogcatify-signature");
-    const rawPayload = await req.json();
+
+    // Validar que haya contenido en el body
+    const contentType = req.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid content type",
+          message: "El Content-Type debe ser application/json"
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    let rawPayload;
+    try {
+      rawPayload = await req.json();
+    } catch (jsonError) {
+      console.error("Error parseando JSON:", jsonError);
+      return new Response(
+        JSON.stringify({
+          error: "Invalid JSON",
+          message: "El body de la petición no es un JSON válido"
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     console.log("Payload recibido:", JSON.stringify(rawPayload, null, 2));
 
