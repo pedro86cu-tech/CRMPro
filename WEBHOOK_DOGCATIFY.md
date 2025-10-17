@@ -243,12 +243,26 @@ Nuevos campos:
 - `external_product_id`: ID del producto en DogCatify
 - `total_price`: Precio total de la línea
 
-### Migración Requerida
+### Valores de payment_status
 
-Antes de usar el webhook, debes aplicar la migración:
+El constraint de `payment_status` acepta los siguientes valores:
+
+- `unpaid` - Sin pagar
+- `pending` - Pago en progreso (usado por DogCatify)
+- `partial` - Parcialmente pagado
+- `paid` - Pagado completamente
+- `refunded` - Reembolsado
+
+### Migraciones Requeridas
+
+Antes de usar el webhook, asegúrate de que estas migraciones estén aplicadas:
 
 ```sql
--- Ubicada en: supabase/migrations/20251017000000_add_dogcatify_fields_to_orders.sql
+-- 1. Campos para DogCatify
+-- supabase/migrations/20251017000000_add_dogcatify_fields_to_orders.sql
+
+-- 2. Fix del constraint de payment_status
+-- supabase/migrations/20251017053000_fix_orders_payment_status_constraint.sql
 ```
 
 ## Seguridad
