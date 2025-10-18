@@ -1554,30 +1554,50 @@ export function OrdersModule() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {selectedOrderItems.map((item, index) => (
-                          <tr key={item.id || index} className="hover:bg-slate-100 transition">
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                item.item_type === 'product'
-                                  ? 'bg-blue-100 text-blue-700'
-                                  : 'bg-emerald-100 text-emerald-700'
-                              }`}>
-                                {item.item_type === 'product' ? 'Producto' : 'Servicio'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-slate-900">{item.description}</td>
-                            <td className="px-4 py-3 text-center text-slate-900">{item.quantity}</td>
-                            <td className="px-4 py-3 text-right text-slate-900">
-                              ${item.unit_price.toFixed(2)}
-                            </td>
-                            <td className="px-4 py-3 text-center text-slate-900">
-                              {item.discount_percent > 0 ? `${item.discount_percent}%` : '-'}
-                            </td>
-                            <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                              ${item.line_total.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
+                        {selectedOrderItems.map((item, index) => {
+                          const imageUrl = item.notes?.startsWith('Imagen: ')
+                            ? item.notes.replace('Imagen: ', '').trim()
+                            : null;
+
+                          return (
+                            <tr key={item.id || index} className="hover:bg-slate-100 transition">
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  item.item_type === 'product'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {item.item_type === 'product' ? 'Producto' : 'Servicio'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  {imageUrl && (
+                                    <img
+                                      src={imageUrl}
+                                      alt={item.description}
+                                      className="w-12 h-12 object-cover rounded-lg border border-slate-300"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                  )}
+                                  <span className="text-slate-900">{item.description}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-center text-slate-900">{item.quantity}</td>
+                              <td className="px-4 py-3 text-right text-slate-900">
+                                ${item.unit_price.toFixed(2)}
+                              </td>
+                              <td className="px-4 py-3 text-center text-slate-900">
+                                {item.discount_percent > 0 ? `${item.discount_percent}%` : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                                ${item.line_total.toFixed(2)}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
