@@ -211,10 +211,45 @@ Deno.serve(async (req: Request) => {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
-    doc.text(`Nº: ${invoice.invoice_number}`, 140, startY + 12);
-    doc.text(`Fecha: ${formatDate(invoice.issue_date)}`, 140, startY + 17);
-    doc.text(`Vencimiento: ${formatDate(invoice.due_date)}`, 140, startY + 22);
-    doc.text(`Moneda: ${order?.currency || currency}`, 140, startY + 27);
+
+    let detailY = startY + 12;
+
+    if (invoice.numero_cfe) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`CFE: ${invoice.numero_cfe}`, 140, detailY);
+      detailY += 5;
+      doc.setFont('helvetica', 'normal');
+    } else {
+      doc.text(`Nº: ${invoice.invoice_number}`, 140, detailY);
+      detailY += 5;
+    }
+
+    if (invoice.serie_cfe) {
+      doc.text(`Serie: ${invoice.serie_cfe}`, 140, detailY);
+      detailY += 5;
+    }
+
+    if (invoice.tipo_cfe) {
+      doc.text(`Tipo: ${invoice.tipo_cfe}`, 140, detailY);
+      detailY += 5;
+    }
+
+    doc.text(`Fecha: ${formatDate(invoice.issue_date)}`, 140, detailY);
+    detailY += 5;
+    doc.text(`Vencimiento: ${formatDate(invoice.due_date)}`, 140, detailY);
+    detailY += 5;
+    doc.text(`Moneda: ${order?.currency || currency}`, 140, detailY);
+
+    if (invoice.cae) {
+      detailY += 5;
+      doc.setFontSize(8);
+      doc.text(`CAE: ${invoice.cae}`, 140, detailY);
+      if (invoice.vencimiento_cae) {
+        detailY += 4;
+        doc.text(`Vence CAE: ${formatDate(invoice.vencimiento_cae)}`, 140, detailY);
+      }
+      doc.setFontSize(10);
+    }
 
     const lineY = Math.max(58, startY + 40);
     doc.setDrawColor(72, 156, 156);

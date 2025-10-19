@@ -230,12 +230,49 @@ Deno.serve(async (req: Request) => {
     }
 
     if (validationResult === "approved") {
+      const responseMapping = config.response_mapping as any;
+      const updateData: any = {
+        status: "validated",
+        validated_at: new Date().toISOString(),
+        validation_response: responsePayload,
+        updated_at: new Date().toISOString()
+      };
+
+      if (responseMapping.numero_cfe) {
+        const numeroCFE = getNestedValue({ response: responsePayload }, responseMapping.numero_cfe);
+        if (numeroCFE) updateData.numero_cfe = numeroCFE;
+      }
+
+      if (responseMapping.serie_cfe) {
+        const serieCFE = getNestedValue({ response: responsePayload }, responseMapping.serie_cfe);
+        if (serieCFE) updateData.serie_cfe = serieCFE;
+      }
+
+      if (responseMapping.tipo_cfe) {
+        const tipoCFE = getNestedValue({ response: responsePayload }, responseMapping.tipo_cfe);
+        if (tipoCFE) updateData.tipo_cfe = tipoCFE;
+      }
+
+      if (responseMapping.cae) {
+        const cae = getNestedValue({ response: responsePayload }, responseMapping.cae);
+        if (cae) updateData.cae = cae;
+      }
+
+      if (responseMapping.vencimiento_cae) {
+        const vencimientoCAE = getNestedValue({ response: responsePayload }, responseMapping.vencimiento_cae);
+        if (vencimientoCAE) updateData.vencimiento_cae = vencimientoCAE;
+      }
+
+      if (responseMapping.qr_code) {
+        const qrCode = getNestedValue({ response: responsePayload }, responseMapping.qr_code);
+        if (qrCode) updateData.qr_code = qrCode;
+      }
+
+      console.log("Actualizando factura con datos de validación:", updateData);
+
       await supabase
         .from("invoices")
-        .update({
-          status: "validated",
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq("id", invoice_id);
     }
 

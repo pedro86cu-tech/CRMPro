@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { FieldMapper } from './FieldMapper';
+import { REQUEST_AVAILABLE_FIELDS, RESPONSE_AVAILABLE_FIELDS, DGI_URUGUAY_TEMPLATE } from './availableFields';
 
 interface APIConfig {
   id: string;
@@ -50,6 +52,7 @@ export function ExternalValidationModule() {
   const [activeTab, setActiveTab] = useState<'config' | 'logs'>('config');
   const [testInvoiceId, setTestInvoiceId] = useState('');
   const [testing, setTesting] = useState(false);
+  const [useVisualMapper, setUseVisualMapper] = useState(true);
 
   const { user } = useAuth();
   const toast = useToast();
@@ -136,6 +139,15 @@ export function ExternalValidationModule() {
     setSelectedConfig(config);
     setFormData(config);
     setShowConfigModal(true);
+  };
+
+  const loadDGITemplate = () => {
+    setFormData({
+      ...formData,
+      request_mapping: DGI_URUGUAY_TEMPLATE.request,
+      response_mapping: DGI_URUGUAY_TEMPLATE.response,
+    });
+    toast.success('Template DGI Uruguay cargado');
   };
 
   const handleTest = async () => {
@@ -590,44 +602,38 @@ export function ExternalValidationModule() {
                   />
                 </div>
 
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Mapeo de Request (JSON)
-                  </label>
-                  <textarea
-                    value={JSON.stringify(formData.request_mapping, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        setFormData({ ...formData, request_mapping: JSON.parse(e.target.value) });
-                      } catch {}
-                    }}
-                    className="w-full border border-slate-300 rounded-lg px-4 py-2 font-mono text-sm"
-                    rows={6}
-                    placeholder='{"invoice_number": "invoice.invoice_number", "total": "invoice.total_amount"}'
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Formato: {`{"campo_destino": "ruta.origen.campo"}`}
-                  </p>
+                <div className="col-span-2 border-t border-slate-200 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-semibold text-slate-900">Mapeo de Campos</h3>
+                    <button
+                      type="button"
+                      onClick={loadDGITemplate}
+                      className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                    >
+                      Cargar Template DGI Uruguay
+                    </button>
+                  </div>
                 </div>
 
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Mapeo de Response (JSON)
-                  </label>
-                  <textarea
-                    value={JSON.stringify(formData.response_mapping, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        setFormData({ ...formData, response_mapping: JSON.parse(e.target.value) });
-                      } catch {}
-                    }}
-                    className="w-full border border-slate-300 rounded-lg px-4 py-2 font-mono text-sm"
-                    rows={4}
-                    placeholder='{"approved": "response.approved", "reference": "response.id"}'
+                <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
+                  <FieldMapper
+                    title="Mapeo de Request (Envío a API)"
+                    mappings={formData.request_mapping || {}}
+                    onChange={(mappings) => setFormData({ ...formData, request_mapping: mappings })}
+                    availableFields={REQUEST_AVAILABLE_FIELDS}
+                    placeholder="Seleccione campo del sistema"
                   />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Formato: {`{"campo_local": "ruta.response.campo"}`}
-                  </p>
+                </div>
+
+                <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
+                  <FieldMapper
+                    title="Mapeo de Response (Captura de Respuesta)"
+                    mappings={formData.response_mapping || {}}
+                    onChange={(mappings) => setFormData({ ...formData, response_mapping: mappings })}
+                    availableFields={RESPONSE_AVAILABLE_FIELDS}
+                    placeholder="Seleccione campo a guardar"
+                    isResponse={true}
+                  />
                 </div>
               </div>
 
