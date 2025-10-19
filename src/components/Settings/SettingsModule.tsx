@@ -80,9 +80,17 @@ export function SettingsModule() {
     smtp: false
   });
 
+  const [currencies, setCurrencies] = useState<Array<{
+    id: string;
+    code: string;
+    name: string;
+    symbol: string;
+  }>>([]);
+
   useEffect(() => {
     loadSettings();
     loadTwilioConfig();
+    loadCurrencies();
   }, []);
 
   useEffect(() => {
@@ -90,6 +98,23 @@ export function SettingsModule() {
       loadInboxConfig();
     }
   }, [user?.id]);
+
+  const loadCurrencies = async () => {
+    const { data, error } = await supabase
+      .from('currencies')
+      .select('id, code, name, symbol')
+      .eq('is_active', true)
+      .order('name');
+
+    if (error) {
+      console.error('Error loading currencies:', error);
+      return;
+    }
+
+    if (data) {
+      setCurrencies(data);
+    }
+  };
 
   const loadSettings = async () => {
     const { data } = await supabase.from('system_settings').select('*');
@@ -733,12 +758,15 @@ export function SettingsModule() {
                   onChange={(e) => setGeneralSettings({ ...generalSettings, currency: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 >
-                  <option value="MXN">MXN - Peso Mexicano</option>
-                  <option value="USD">USD - Dólar Americano</option>
-                  <option value="EUR">EUR - Euro</option>
-                  <option value="COP">COP - Peso Colombiano</option>
-                  <option value="ARS">ARS - Peso Argentino</option>
-                  <option value="CLP">CLP - Peso Chileno</option>
+                  {currencies.length === 0 ? (
+                    <option value="">Cargando monedas...</option>
+                  ) : (
+                    currencies.map(currency => (
+                      <option key={currency.id} value={currency.code}>
+                        {currency.code} - {currency.name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
