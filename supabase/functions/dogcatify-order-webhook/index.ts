@@ -27,6 +27,11 @@ interface DogCatifyItem {
   quantity: number;
   partnerId: string;
   partnerName: string;
+  iva_rate?: number;
+  iva_amount?: number;
+  subtotal?: number;
+  original_price?: number;
+  discount_percentage?: number;
 }
 
 interface DogCatifyOrder {
@@ -53,6 +58,9 @@ interface DogCatifyOrder {
   booking_notes?: string | null;
   appointment_date?: string | null;
   appointment_time?: string | null;
+  iva_rate?: number;
+  iva_amount?: number;
+  subtotal?: number;
 }
 
 interface WebhookPayload {
@@ -249,7 +257,9 @@ Deno.serve(async (req: Request) => {
 
         const orderNumber = `DC-${Date.now()}-${orderData.id.substring(0, 8)}`;
 
-        const subtotal = orderData.total_amount - orderData.commission_amount;
+        const subtotal = orderData.subtotal || (orderData.total_amount - orderData.commission_amount);
+        const taxRate = orderData.iva_rate || 0;
+        const taxAmount = orderData.iva_amount || 0;
         const shippingAddress = `${orderData.shipping_address || customerData.calle + ' ' + customerData.numero}`;
 
         const { data: order, error: orderError } = await supabase
@@ -262,7 +272,8 @@ Deno.serve(async (req: Request) => {
             payment_method: orderData.payment_method || 'unknown',
             total_amount: orderData.total_amount,
             subtotal: subtotal,
-            tax_amount: 0,
+            tax_rate: taxRate,
+            tax_amount: taxAmount,
             discount_amount: 0,
             shipping_cost: 0,
             shipping_address: shippingAddress,
@@ -293,7 +304,7 @@ Deno.serve(async (req: Request) => {
             unit_price: item.price,
             line_total: item.quantity * item.price,
             total_price: item.quantity * item.price,
-            discount_percent: 0,
+            discount_percent: item.discount_percentage || 0,
             external_product_id: item.id,
             item_type: 'product',
             notes: item.image ? `Imagen: ${item.image}` : ''
