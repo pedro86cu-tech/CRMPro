@@ -163,6 +163,7 @@ Deno.serve(async (req: Request) => {
     const subtotalTax22 = Number(invoice.subtotal) || 0;
     const tax22 = Number(invoice.tax_amount) || 0;
     const discount = Number(invoice.discount_amount) || 0;
+    const shippingCost = Number(order?.shipping_cost) || 0;
     const total = Number(invoice.total_amount) || 0;
 
     const doc = new jsPDF();
@@ -307,6 +308,12 @@ Deno.serve(async (req: Request) => {
     yPosition += 6;
     doc.text('IVA:', 125, yPosition);
     doc.text(formatPrice(tax22, order?.currency || currency), 185, yPosition, { align: 'right' });
+
+    if (shippingCost > 0) {
+      yPosition += 6;
+      doc.text('Envío:', 125, yPosition);
+      doc.text(formatPrice(shippingCost, order?.currency || currency), 185, yPosition, { align: 'right' });
+    }
 
     yPosition += 10;
     doc.setFillColor(72, 156, 156);

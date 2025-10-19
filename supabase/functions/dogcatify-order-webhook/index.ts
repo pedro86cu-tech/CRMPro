@@ -36,6 +36,13 @@ interface DogCatifyItem {
   currency_code_dgi?: string;
 }
 
+interface ShippingInfo {
+  shipping_cost: number;
+  shipping_total: number;
+  shipping_address: string;
+  shipping_iva_amount: number;
+}
+
 interface DogCatifyOrder {
   id: string;
   partner_id: string;
@@ -48,6 +55,8 @@ interface DogCatifyOrder {
   commission_amount: number;
   order_type: string;
   shipping_address: string;
+  shipping_cost?: number;
+  shipping_info?: ShippingInfo | null;
   created_at: string;
   updated_at: string;
   customer: DogCatifyCustomer;
@@ -74,7 +83,7 @@ interface WebhookPayload {
 
 async function verifySignature(payload: any, signature: string): Promise<boolean> {
   const webhookSecret = Deno.env.get("DOGCATIFY_WEBHOOK_SECRET");
-  
+
   if (!webhookSecret) {
     console.error("DOGCATIFY_WEBHOOK_SECRET no est\u00e1 configurado");
     return false;
@@ -84,7 +93,7 @@ async function verifySignature(payload: any, signature: string): Promise<boolean
     const encoder = new TextEncoder();
     const data = encoder.encode(JSON.stringify(payload));
     const key = encoder.encode(webhookSecret);
-    
+
     const cryptoKey = await crypto.subtle.importKey(
       "raw",
       key,
@@ -92,12 +101,12 @@ async function verifySignature(payload: any, signature: string): Promise<boolean
       false,
       ["sign"]
     );
-    
+
     const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, data);
     const expected = Array.from(new Uint8Array(signatureBuffer))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
-    
+
     return signature === expected;
   } catch (error) {
     console.error("Error verificando firma:", error);
@@ -263,23 +272,35 @@ Deno.serve(async (req: Request) => {
         let taxRate = orderData.iva_rate || 0;
         let taxAmount = orderData.iva_amount || 0;
         let totalAmount = orderData.total_amount || 0;
+        let shippingCost = 0;
+        let shippingTaxAmount = 0;
+
+        if (orderData.shipping_info && orderData.shipping_info.shipping_cost) {
+          shippingCost = orderData.shipping_info.shipping_cost || 0;
+          shippingTaxAmount = orderData.shipping_info.shipping_iva_amount || 0;
+          console.log(`Costo de env\u00edo detectado: $${shippingCost}, IVA env\u00edo: $${shippingTaxAmount}`);
+        } else if (orderData.shipping_cost) {
+          shippingCost = orderData.shipping_cost || 0;
+          console.log(`Costo de env\u00edo (campo directo): $${shippingCost}`);
+        }
 
         if (subtotal === 0 || taxAmount === 0) {
           if (taxRate > 0 && totalAmount > 0) {
-            subtotal = totalAmount / (1 + taxRate / 100);
-            taxAmount = totalAmount - subtotal;
+            const totalWithoutShipping = totalAmount - shippingCost - shippingTaxAmount;
+            subtotal = totalWithoutShipping / (1 + taxRate / 100);
+            taxAmount = totalWithoutShipping - subtotal;
           } else {
-            subtotal = totalAmount;
+            subtotal = totalAmount - shippingCost - shippingTaxAmount;
             taxAmount = 0;
             taxRate = 0;
           }
         } else {
-          totalAmount = subtotal + taxAmount;
+          totalAmount = subtotal + taxAmount + shippingCost + shippingTaxAmount;
         }
 
-        console.log(`C\u00e1lculos financieros: Subtotal=${subtotal}, IVA=${taxAmount} (${taxRate}%), Total=${totalAmount}`);
+        console.log(`C\u00e1lculos financieros: Subtotal=${subtotal}, IVA=${taxAmount} (${taxRate}%), Env\u00edo=${shippingCost}, IVA Env\u00edo=${shippingTaxAmount}, Total=${totalAmount}`);
 
-        const shippingAddress = `${orderData.shipping_address || customerData.calle + ' ' + customerData.numero}`;
+        const shippingAddress = orderData.shipping_info?.shipping_address || orderData.shipping_address || `${customerData.calle} ${customerData.numero}`;
         const orderCurrency = orderData.items && orderData.items.length > 0 ? orderData.items[0].currency : 'UYU';
         console.log("Moneda de la orden:", orderCurrency);
 
@@ -294,15 +315,15 @@ Deno.serve(async (req: Request) => {
             total_amount: totalAmount,
             subtotal: subtotal,
             tax_rate: taxRate,
-            tax_amount: taxAmount,
+            tax_amount: taxAmount + shippingTaxAmount,
             discount_amount: 0,
-            shipping_cost: 0,
+            shipping_cost: shippingCost,
             shipping_address: shippingAddress,
             billing_address: shippingAddress,
             currency: orderCurrency,
             external_order_id: orderData.id,
             external_partner_id: orderData.partner_id,
-            notes: `Orden importada desde DogCatify (${orderData.items[0]?.partnerName || 'Partner'})\nTipo: ${orderData.order_type}\nM\u00e9todo de pago: ${orderData.payment_method}\nMonto partner: ${orderData.partner_amount}\nComisi\u00f3n: ${orderData.commission_amount}`,
+            notes: `Orden importada desde DogCatify (${orderData.items[0]?.partnerName || 'Partner'})\nTipo: ${orderData.order_type}\nM\u00e9todo de pago: ${orderData.payment_method}\nMonto partner: ${orderData.partner_amount}\nComisi\u00f3n: ${orderData.commission_amount}${shippingCost > 0 ? `\nEnv\u00edo: $${shippingCost} (IVA: $${shippingTaxAmount})` : ''}`,
             metadata: orderData,
             order_date: new Date(orderData.created_at).toISOString().split('T')[0]
           })
@@ -352,7 +373,7 @@ Deno.serve(async (req: Request) => {
             console.log(`\u2713 ${orderItems.length} items creados`);
           }
         }
-        
+
         break;
       }
 
@@ -468,7 +489,7 @@ Deno.serve(async (req: Request) => {
 
           console.log("\u2713 Orden cancelada:", existingOrder.id);
         }
-        
+
         break;
       }
 
@@ -499,7 +520,7 @@ Deno.serve(async (req: Request) => {
 
           console.log("\u2713 Orden completada:", existingOrder.id);
         }
-        
+
         break;
       }
 
@@ -518,13 +539,13 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-    
+
   } catch (error: any) {
     console.error("Error procesando webhook:", error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: "Internal server error",
-        message: error.message 
+        message: error.message
       }),
       {
         status: 500,
