@@ -24,6 +24,7 @@ interface DogCatifyItem {
   name: string;
   image?: string;
   price: number;
+  currency: string;
   quantity: number;
   partnerId: string;
   partnerName: string;
@@ -32,6 +33,7 @@ interface DogCatifyItem {
   subtotal?: number;
   original_price?: number;
   discount_percentage?: number;
+  currency_code_dgi?: string;
 }
 
 interface DogCatifyOrder {
@@ -262,6 +264,9 @@ Deno.serve(async (req: Request) => {
         const taxAmount = orderData.iva_amount || 0;
         const shippingAddress = `${orderData.shipping_address || customerData.calle + ' ' + customerData.numero}`;
 
+        const orderCurrency = orderData.items && orderData.items.length > 0 ? orderData.items[0].currency : 'UYU';
+        console.log("Moneda de la orden:", orderCurrency);
+
         const { data: order, error: orderError } = await supabase
           .from("orders")
           .insert({
@@ -278,7 +283,7 @@ Deno.serve(async (req: Request) => {
             shipping_cost: 0,
             shipping_address: shippingAddress,
             billing_address: shippingAddress,
-            currency: 'UYU',
+            currency: orderCurrency,
             external_order_id: orderData.id,
             external_partner_id: orderData.partner_id,
             notes: `Orden importada desde DogCatify (${orderData.items[0]?.partnerName || 'Partner'})\nTipo: ${orderData.order_type}\nMétodo de pago: ${orderData.payment_method}\nMonto partner: ${orderData.partner_amount}\nComisión: ${orderData.commission_amount}`,
@@ -307,7 +312,7 @@ Deno.serve(async (req: Request) => {
             discount_percent: item.discount_percentage || 0,
             external_product_id: item.id,
             item_type: 'product',
-            currency: 'UYU',
+            currency: item.currency || 'UYU',
             notes: item.image ? `Imagen: ${item.image}` : ''
           }));
 
