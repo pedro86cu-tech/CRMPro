@@ -1698,14 +1698,22 @@ export function OrdersModule() {
                       ${selectedOrder.subtotal.toFixed(2)} {selectedOrder.currency}
                     </span>
                   </div>
-                  {selectedOrder.discount_amount > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-700">Descuento:</span>
-                      <span className="font-semibold text-red-600">
-                        -${selectedOrder.discount_amount.toFixed(2)} {selectedOrder.currency}
-                      </span>
-                    </div>
-                  )}
+                  {(() => {
+                    const totalItemsDiscount = selectedOrderItems.reduce((sum, item) => {
+                      const discountAmount = item.quantity * item.unit_price * (item.discount_percent / 100);
+                      return sum + discountAmount;
+                    }, 0);
+                    const totalDiscount = totalItemsDiscount + (selectedOrder.discount_amount || 0);
+
+                    return totalDiscount > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-700">Descuento:</span>
+                        <span className="font-semibold text-red-600">
+                          -${totalDiscount.toFixed(2)} {selectedOrder.currency}
+                        </span>
+                      </div>
+                    );
+                  })()}
                   <div className="flex justify-between items-center">
                     <span className="text-slate-700">IVA/Tax ({selectedOrder.tax_rate}%):</span>
                     <span className="font-semibold text-slate-900">
@@ -2064,7 +2072,7 @@ export function OrdersModule() {
                 <div className="space-y-3">
                   {selectedOrderItems.map((item, index) => (
                     <div key={item.id || index} className="bg-white p-4 rounded-lg border border-slate-200">
-                      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
                         <div className="lg:col-span-2">
                           <label className="block text-xs font-semibold text-slate-600 mb-1">
                             Descripción
@@ -2108,6 +2116,25 @@ export function OrdersModule() {
                             onChange={(e) => {
                               const updated = [...selectedOrderItems];
                               updated[index].unit_price = parseFloat(e.target.value);
+                              updated[index].line_total = updated[index].quantity * updated[index].unit_price * (1 - updated[index].discount_percent / 100);
+                              setSelectedOrderItems(updated);
+                            }}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Desc. (%)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={item.discount_percent}
+                            onChange={(e) => {
+                              const updated = [...selectedOrderItems];
+                              updated[index].discount_percent = parseFloat(e.target.value) || 0;
                               updated[index].line_total = updated[index].quantity * updated[index].unit_price * (1 - updated[index].discount_percent / 100);
                               setSelectedOrderItems(updated);
                             }}
