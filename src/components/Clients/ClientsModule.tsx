@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useDialer } from '../../contexts/DialerContext';
+import { useNavigation } from '../../contexts/NavigationContext';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 
 interface Client {
@@ -49,6 +50,7 @@ export function ClientsModule() {
   const { user } = useAuth();
   const toast = useToast();
   const { initiateCall } = useDialer();
+  const { navigateToInbox } = useNavigation();
 
   const [formData, setFormData] = useState({
     company_name: '',
@@ -394,7 +396,7 @@ export function ClientsModule() {
               <div className="space-y-3 mb-6">
                 <div className="flex items-center text-sm text-slate-600 group">
                   <button
-                    onClick={() => window.location.href = `mailto:${client.email}`}
+                    onClick={() => navigateToInbox(client.email)}
                     className="flex items-center hover:text-blue-600 transition-colors flex-1"
                     title="Enviar correo"
                   >

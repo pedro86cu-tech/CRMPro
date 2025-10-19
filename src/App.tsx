@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { DialerProvider } from './contexts/DialerContext';
+import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { CallbackHandler } from './components/Auth/CallbackHandler';
 import { Sidebar } from './components/Layout/Sidebar';
@@ -44,7 +45,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function MainApp() {
-  const [activeModule, setActiveModule] = useState('dashboard');
+  const { activeModule, setActiveModule } = useNavigation();
   const [incomingCallModalOpen, setIncomingCallModalOpen] = useState(false);
   const [currentIncomingCall, setCurrentIncomingCall] = useState<any>(null);
   const { isReady, device, activeCall, makeCall } = useTwilioDevice();
@@ -119,18 +120,20 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <Routes>
-            <Route path="/login" element={<LoginForm />} />
-            <Route path="/callback" element={<CallbackHandler />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <MainApp />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
+          <NavigationProvider>
+            <Routes>
+              <Route path="/login" element={<LoginForm />} />
+              <Route path="/callback" element={<CallbackHandler />} />
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <MainApp />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </NavigationProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

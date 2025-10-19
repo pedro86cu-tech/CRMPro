@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useNavigation } from '../../contexts/NavigationContext';
 import { externalAuth } from '../../lib/externalAuth';
 
 interface InboxEmail {
@@ -46,6 +47,7 @@ interface EmailDraft {
 export function InboxModule() {
   const { user } = useAuth();
   const toast = useToast();
+  const { inboxRecipient, clearInboxRecipient } = useNavigation();
   const [emails, setEmails] = useState<InboxEmail[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<InboxEmail | null>(null);
   const [activeFolder, setActiveFolder] = useState<'inbox' | 'sent' | 'drafts' | 'starred' | 'archived' | 'trash'>('inbox');
@@ -74,6 +76,21 @@ export function InboxModule() {
     checkEmailAccount();
     loadEmails();
   }, [activeFolder]);
+
+  useEffect(() => {
+    if (inboxRecipient) {
+      setShowCompose(true);
+      setComposeData({
+        to_emails: [inboxRecipient],
+        cc_emails: [],
+        bcc_emails: [],
+        subject: '',
+        body_html: ''
+      });
+      setToInput(inboxRecipient);
+      clearInboxRecipient();
+    }
+  }, [inboxRecipient, clearInboxRecipient]);
 
   const checkEmailAccount = async () => {
     if (!user?.id) return;
