@@ -4,10 +4,11 @@ import { ensureCurrentUserInSystemUsers } from '../../lib/userSync';
 import {
   Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, TrendingUp,
   DollarSign, ShoppingCart, FileText, Activity, Users, Building2, X,
-  Star, Globe, Calendar, User, Briefcase, Tag
+  Star, Globe, Calendar, User, Briefcase, Tag, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useDialer } from '../../contexts/DialerContext';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 
 interface Client {
@@ -43,8 +44,11 @@ export function ClientsModule() {
     inactive: 0,
     newThisMonth: 0
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9;
   const { user } = useAuth();
   const toast = useToast();
+  const { initiateCall } = useDialer();
 
   const [formData, setFormData] = useState({
     company_name: '',
@@ -78,6 +82,10 @@ export function ClientsModule() {
     };
     initialize();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const loadClients = async () => {
     const { data, error } = await supabase
@@ -351,7 +359,9 @@ export function ClientsModule() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredClients.map((client) => (
+        {filteredClients
+          .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+          .map((client) => (
           <div
             key={client.id}
             className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
@@ -382,14 +392,26 @@ export function ClientsModule() {
               </div>
 
               <div className="space-y-3 mb-6">
-                <div className="flex items-center text-sm text-slate-600">
-                  <Mail className="w-4 h-4 mr-3 text-blue-500" />
-                  <span className="truncate">{client.email}</span>
+                <div className="flex items-center text-sm text-slate-600 group">
+                  <button
+                    onClick={() => window.location.href = `mailto:${client.email}`}
+                    className="flex items-center hover:text-blue-600 transition-colors flex-1"
+                    title="Enviar correo"
+                  >
+                    <Mail className="w-4 h-4 mr-3 text-blue-500 group-hover:scale-110 transition-transform" />
+                    <span className="truncate">{client.email}</span>
+                  </button>
                 </div>
                 {client.phone && (
-                  <div className="flex items-center text-sm text-slate-600">
-                    <Phone className="w-4 h-4 mr-3 text-emerald-500" />
-                    <span>{client.phone}</span>
+                  <div className="flex items-center text-sm text-slate-600 group">
+                    <button
+                      onClick={() => initiateCall(client.phone, client.contact_name || client.company_name)}
+                      className="flex items-center hover:text-emerald-600 transition-colors flex-1"
+                      title="Llamar ahora"
+                    >
+                      <Phone className="w-4 h-4 mr-3 text-emerald-500 group-hover:scale-110 transition-transform" />
+                      <span>{client.phone}</span>
+                    </button>
                   </div>
                 )}
                 {(client.city || client.country) && (
@@ -443,6 +465,44 @@ export function ClientsModule() {
           </div>
         ))}
       </div>
+
+      {filteredClients.length > itemsPerPage && (
+        <div className="flex items-center justify-center gap-4 mt-8">
+          <button
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            Anterior
+          </button>
+
+          <div className="flex items-center gap-2">
+            {Array.from({ length: Math.ceil(filteredClients.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`w-10 h-10 rounded-xl font-semibold transition-colors ${
+                  currentPage === page
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                    : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(Math.min(Math.ceil(filteredClients.length / itemsPerPage), currentPage + 1))}
+            disabled={currentPage === Math.ceil(filteredClients.length / itemsPerPage)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Siguiente
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
