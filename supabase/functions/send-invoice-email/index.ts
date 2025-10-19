@@ -177,8 +177,8 @@ Deno.serve(async (req: Request) => {
           reader.onloadend = () => resolve(reader.result as string);
           reader.readAsDataURL(logoBlob);
         });
-        doc.addImage(logoBase64, 'PNG', 20, 20, 30, 30);
-        logoYOffset = 40;
+        doc.addImage(logoBase64, 'PNG', 20, 28, 30, 30);
+        logoYOffset = 48;
       } catch (e) {
         logoYOffset = 0;
       }
