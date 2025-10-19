@@ -19,6 +19,7 @@ import { TicketsModule } from './components/Tickets/TicketsModule';
 import { InboxModule } from './components/Inbox/InboxModule';
 import { SettingsModule } from './components/Settings/SettingsModule';
 import { AccountingModule } from './components/Accounting/AccountingModule';
+import ParametersModule from './components/Settings/ParametersModule';
 import { useTwilioDevice } from './hooks/useTwilioDevice';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -76,6 +77,8 @@ function MainApp() {
         return <SettingsModule />;
       case 'accounting':
         return <AccountingModule />;
+      case 'parameters':
+        return <ParametersModule />;
       default:
         return <DashboardModule />;
     }

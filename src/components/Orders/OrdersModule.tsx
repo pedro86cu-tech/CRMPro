@@ -83,6 +83,13 @@ export function OrdersModule() {
     avgOrderValue: 0,
     thisMonth: 0
   });
+
+  const [currencies, setCurrencies] = useState<any[]>([]);
+  const [orderStatuses, setOrderStatuses] = useState<any[]>([]);
+  const [paymentStatuses, setPaymentStatuses] = useState<any[]>([]);
+  const [itemTypes, setItemTypes] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+
   const { user } = useAuth();
   const toast = useToast();
 
@@ -116,7 +123,28 @@ export function OrdersModule() {
 
   useEffect(() => {
     loadOrders();
+    loadParameters();
   }, []);
+
+  const loadParameters = async () => {
+    try {
+      const [currData, orderStatusData, payStatusData, itemTypeData, payMethodData] = await Promise.all([
+        supabase.from('currencies').select('*').eq('is_active', true).order('code'),
+        supabase.from('order_statuses').select('*').eq('is_active', true).order('sort_order'),
+        supabase.from('payment_statuses').select('*').eq('is_active', true).order('sort_order'),
+        supabase.from('item_types').select('*').eq('is_active', true).order('name'),
+        supabase.from('payment_methods').select('*').eq('is_active', true).order('name')
+      ]);
+
+      if (currData.data) setCurrencies(currData.data);
+      if (orderStatusData.data) setOrderStatuses(orderStatusData.data);
+      if (payStatusData.data) setPaymentStatuses(payStatusData.data);
+      if (itemTypeData.data) setItemTypes(itemTypeData.data);
+      if (payMethodData.data) setPaymentMethods(payMethodData.data);
+    } catch (error) {
+      console.error('Error loading parameters:', error);
+    }
+  };
 
   useEffect(() => {
     if (clientSearch.length >= 2) {
@@ -966,11 +994,9 @@ export function OrdersModule() {
                     onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                   >
-                    <option value="USD">USD - Dólar</option>
-                    <option value="EUR">EUR - Euro</option>
-                    <option value="MXN">MXN - Peso Mexicano</option>
-                    <option value="COP">COP - Peso Colombiano</option>
-                    <option value="ARS">ARS - Peso Argentino</option>
+                    {currencies.map((curr) => (
+                      <option key={curr.code} value={curr.code}>{curr.code} - {curr.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -986,14 +1012,9 @@ export function OrdersModule() {
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                   >
-                    <option value="pending">Pendiente</option>
-                    <option value="confirmed">Confirmada</option>
-                    <option value="in_progress">En Progreso</option>
-                    <option value="processing">Procesando</option>
-                    <option value="shipped">Enviada</option>
-                    <option value="delivered">Entregada</option>
-                    <option value="completed">Completada</option>
-                    <option value="cancelled">Cancelada</option>
+                    {orderStatuses.map((status) => (
+                      <option key={status.code} value={status.code}>{status.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -1007,13 +1028,9 @@ export function OrdersModule() {
                     onChange={(e) => setFormData({ ...formData, payment_status: e.target.value as any })}
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                   >
-                    <option value="unpaid">Sin Pagar</option>
-                    <option value="pending">Pendiente</option>
-                    <option value="processing">Procesando</option>
-                    <option value="partial">Parcial</option>
-                    <option value="paid">Pagado</option>
-                    <option value="refunded">Reembolsado</option>
-                    <option value="cancelled">Cancelado</option>
+                    {paymentStatuses.map((status) => (
+                      <option key={status.code} value={status.code}>{status.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -1022,13 +1039,16 @@ export function OrdersModule() {
                     <CreditCard className="w-4 h-4 inline mr-2 text-indigo-600" />
                     Método de Pago
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.payment_method}
                     onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                    placeholder="ej: Mercado Pago, Stripe, Transferencia"
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                  />
+                  >
+                    <option value="">Seleccionar método</option>
+                    {paymentMethods.map((method) => (
+                      <option key={method.code} value={method.code}>{method.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -1058,8 +1078,9 @@ export function OrdersModule() {
                         onChange={(e) => setNewItem({ ...newItem, item_type: e.target.value as any })}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition text-sm"
                       >
-                        <option value="product">Producto</option>
-                        <option value="service">Servicio</option>
+                        {itemTypes.map((type) => (
+                          <option key={type.code} value={type.code}>{type.name}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -1092,11 +1113,9 @@ export function OrdersModule() {
                         onChange={(e) => setNewItem({ ...newItem, currency: e.target.value })}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition text-sm"
                       >
-                        <option value="UYU">UYU - Peso Uruguayo</option>
-                        <option value="USD">USD - Dólar</option>
-                        <option value="EUR">EUR - Euro</option>
-                        <option value="ARS">ARS - Peso Argentino</option>
-                        <option value="BRL">BRL - Real Brasileño</option>
+                        {currencies.map((curr) => (
+                          <option key={curr.code} value={curr.code}>{curr.code} - {curr.name}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -1312,9 +1331,9 @@ export function OrdersModule() {
                         onChange={(e) => setFormData({ ...formData, payment_status: e.target.value as any })}
                         className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                       >
-                        <option value="unpaid">Sin pagar</option>
-                        <option value="partial">Parcial</option>
-                        <option value="paid">Pagado</option>
+                        {paymentStatuses.map((status) => (
+                          <option key={status.code} value={status.code}>{status.name}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -1398,14 +1417,9 @@ export function OrdersModule() {
                         onChange={(e) => updateStatus(selectedOrder.id, e.target.value as Order['status'])}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition"
                       >
-                        <option value="pending">Pendiente</option>
-                        <option value="confirmed">Confirmada</option>
-                        <option value="in_progress">En Progreso</option>
-                        <option value="processing">Procesando</option>
-                        <option value="shipped">Enviada</option>
-                        <option value="delivered">Entregada</option>
-                        <option value="completed">Completada</option>
-                        <option value="cancelled">Cancelada</option>
+                        {orderStatuses.map((status) => (
+                          <option key={status.code} value={status.code}>{status.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -1934,11 +1948,9 @@ export function OrdersModule() {
                       onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                     >
-                      <option value="USD">USD - Dólar</option>
-                      <option value="EUR">EUR - Euro</option>
-                      <option value="MXN">MXN - Peso Mexicano</option>
-                      <option value="COP">COP - Peso Colombiano</option>
-                      <option value="ARS">ARS - Peso Argentino</option>
+                      {currencies.map((curr) => (
+                        <option key={curr.code} value={curr.code}>{curr.code} - {curr.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

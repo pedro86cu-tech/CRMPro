@@ -32,6 +32,7 @@ const menuItems = [
   { id: 'calls', label: 'Llamadas', icon: Phone },
   { id: 'tickets', label: 'Tickets', icon: Ticket },
   { id: 'inbox', label: 'Buzón', icon: Inbox },
+  { id: 'parameters', label: 'Parámetros', icon: Settings },
   { id: 'settings', label: 'Configuración', icon: Settings },
 ];
 
