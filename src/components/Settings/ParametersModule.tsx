@@ -106,21 +106,27 @@ const ParametersModule: React.FC = () => {
         dataToSave.is_default = formData.is_default ?? false;
       }
 
+      console.log('[PARAMETERS] Saving data:', { activeTab, editingId, dataToSave });
+
       if (editingId) {
         dataToSave.updated_at = new Date().toISOString();
-        const { error } = await supabase
+        const response = await supabase
           .from(activeTab)
           .update(dataToSave)
           .eq('id', editingId);
 
-        if (error) throw error;
+        console.log('[PARAMETERS] Update response:', response);
+
+        if (response.error) throw response.error;
         toast.success('Parámetro actualizado correctamente');
       } else {
-        const { error } = await supabase
+        const response = await supabase
           .from(activeTab)
           .insert([dataToSave]);
 
-        if (error) throw error;
+        console.log('[PARAMETERS] Insert response:', response);
+
+        if (response.error) throw response.error;
         toast.success('Parámetro creado correctamente');
       }
 
@@ -134,7 +140,15 @@ const ParametersModule: React.FC = () => {
   };
 
   const handleEdit = (param: Parameter) => {
-    setFormData(param);
+    setFormData({
+      ...param,
+      color: param.color || '#64748b',
+      symbol: param.symbol || '',
+      iso_code: param.iso_code || '',
+      sort_order: param.sort_order ?? 0,
+      is_active: param.is_active ?? true,
+      is_default: param.is_default ?? false
+    });
     setEditingId(param.id);
     setShowAddForm(true);
   };
