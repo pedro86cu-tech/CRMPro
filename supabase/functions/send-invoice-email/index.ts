@@ -177,14 +177,14 @@ Deno.serve(async (req: Request) => {
           reader.onloadend = () => resolve(reader.result as string);
           reader.readAsDataURL(logoBlob);
         });
-        doc.addImage(logoBase64, 'PNG', 20, 15, 30, 30);
-        logoYOffset = 35;
+        doc.addImage(logoBase64, 'PNG', 20, 20, 30, 30);
+        logoYOffset = 40;
       } catch (e) {
         logoYOffset = 0;
       }
     }
 
-    const startY = logoYOffset || 20;
+    const startY = logoYOffset || 25;
 
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
@@ -201,21 +201,21 @@ Deno.serve(async (req: Request) => {
     doc.text(`Email: ${companyInfo.email}`, logoYOffset ? 55 : 20, startY + 27);
 
     doc.setFillColor(72, 156, 156);
-    doc.rect(140, startY - 8, 50, 12, 'F');
+    doc.rect(140, startY - 5, 50, 12, 'F');
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
-    doc.text('FACTURA', 165, startY - 1, { align: 'center' });
+    doc.text('FACTURA', 165, startY + 2, { align: 'center' });
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
-    doc.text(`Nº: ${invoice.invoice_number}`, 140, startY + 7);
-    doc.text(`Fecha: ${formatDate(invoice.issue_date)}`, 140, startY + 12);
-    doc.text(`Vencimiento: ${formatDate(invoice.due_date)}`, 140, startY + 17);
-    doc.text(`Moneda: ${order?.currency || currency}`, 140, startY + 22);
+    doc.text(`Nº: ${invoice.invoice_number}`, 140, startY + 12);
+    doc.text(`Fecha: ${formatDate(invoice.issue_date)}`, 140, startY + 17);
+    doc.text(`Vencimiento: ${formatDate(invoice.due_date)}`, 140, startY + 22);
+    doc.text(`Moneda: ${order?.currency || currency}`, 140, startY + 27);
 
-    const lineY = Math.max(52, startY + 35);
+    const lineY = Math.max(58, startY + 40);
     doc.setDrawColor(72, 156, 156);
     doc.setLineWidth(0.5);
     doc.line(20, lineY, 190, lineY);
@@ -241,7 +241,7 @@ Deno.serve(async (req: Request) => {
       doc.text(`Tel: ${client.phone}`, 20, client.company_name ? clientY + 27 : clientY + 22);
     }
 
-    let yPosition = clientY + 38;
+    let yPosition = clientY + 40;
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -254,7 +254,7 @@ Deno.serve(async (req: Request) => {
     doc.text('Desc%', 155, yPosition + 5);
     doc.text('Total', 175, yPosition + 5);
 
-    yPosition += 10;
+    yPosition += 13;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(60, 60, 60);
