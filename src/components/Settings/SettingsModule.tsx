@@ -77,8 +77,13 @@ export function SettingsModule() {
   useEffect(() => {
     loadSettings();
     loadTwilioConfig();
-    loadInboxConfig();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadInboxConfig();
+    }
+  }, [user?.id]);
 
   const loadSettings = async () => {
     const { data } = await supabase.from('system_settings').select('*');
@@ -109,17 +114,43 @@ export function SettingsModule() {
   };
 
   const loadInboxConfig = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('[SETTINGS] No user ID available for loading inbox config');
+      return;
+    }
 
-    const { data } = await supabase
+    console.log('[SETTINGS] Loading inbox config for user:', user.id);
+
+    const { data, error } = await supabase
       .from('email_accounts')
       .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
+      .or(`user_id.eq.${user.id},created_by.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
+    if (error) {
+      console.error('[SETTINGS] Error loading inbox config:', error);
+    }
+
+    console.log('[SETTINGS] Inbox config loaded:', data);
+
     if (data) {
-      setInboxConfig(data);
+      setInboxConfig({
+        id: data.id || '',
+        email_address: data.email_address || '',
+        display_name: data.display_name || '',
+        imap_host: data.imap_host || '',
+        imap_port: data.imap_port || 993,
+        imap_username: data.imap_username || '',
+        imap_password: data.imap_password || '',
+        smtp_host: data.smtp_host || '',
+        smtp_port: data.smtp_port || 465,
+        smtp_username: data.smtp_username || '',
+        smtp_password: data.smtp_password || '',
+        use_ssl: data.use_ssl ?? true,
+        is_active: data.is_active ?? true
+      });
     }
   };
 
