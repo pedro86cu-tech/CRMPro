@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.7";
+import { jsPDF } from "npm:jspdf@2.5.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -158,163 +159,138 @@ Deno.serve(async (req: Request) => {
       web: settings.company_website || "www.miempresa.com"
     };
 
-    const itemsHtml = (invoiceItems || []).map((item: any) => {
+    const subtotalTax22 = Number(invoice.subtotal) || 0;
+    const tax22 = Number(invoice.tax_amount) || 0;
+    const discount = Number(invoice.discount_amount) || 0;
+    const total = Number(invoice.total_amount) || 0;
+
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyInfo.name, 20, 20);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`RUT: ${companyInfo.rut}`, 20, 27);
+    doc.text(`${companyInfo.address}`, 20, 32);
+    doc.text(`${companyInfo.city}, ${companyInfo.country}`, 20, 37);
+    doc.text(`Tel: ${companyInfo.phone}`, 20, 42);
+    doc.text(`Email: ${companyInfo.email}`, 20, 47);
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FACTURA ELECTRÓNICA', 140, 20);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Nº: ${invoice.invoice_number}`, 140, 27);
+    doc.text(`Fecha: ${formatDate(invoice.issue_date)}`, 140, 32);
+    doc.text(`Vencimiento: ${formatDate(invoice.due_date)}`, 140, 37);
+    doc.text(`Moneda: ${order?.currency || currency}`, 140, 42);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 52, 190, 52);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CLIENTE', 20, 60);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(client.contact_name, 20, 67);
+    if (client.company_name) {
+      doc.text(client.company_name, 20, 72);
+    }
+    if (client.address) {
+      doc.text(client.address, 20, client.company_name ? 77 : 72);
+    }
+    doc.text(`Email: ${client.email}`, 20, client.company_name ? 82 : 77);
+    if (client.phone) {
+      doc.text(`Tel: ${client.phone}`, 20, client.company_name ? 87 : 82);
+    }
+
+    let yPosition = 100;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setFillColor(249, 250, 251);
+    doc.rect(20, yPosition, 170, 8, 'F');
+    doc.text('Código', 22, yPosition + 5);
+    doc.text('Descripción', 45, yPosition + 5);
+    doc.text('Cant', 100, yPosition + 5);
+    doc.text('P.Unit', 115, yPosition + 5);
+    doc.text('Desc%', 135, yPosition + 5);
+    doc.text('IVA%', 155, yPosition + 5);
+    doc.text('Total', 175, yPosition + 5);
+
+    yPosition += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+
+    (invoiceItems || []).forEach((item: any) => {
       const itemSubtotal = Number(item.quantity) * Number(item.unit_price);
       const itemDiscount = itemSubtotal * (Number(item.discount) / 100);
       const itemAfterDiscount = itemSubtotal - itemDiscount;
       const itemTax = itemAfterDiscount * (Number(item.tax_rate) / 100);
       const itemTotal = itemAfterDiscount + itemTax;
 
-      return `
-        <tr>
-          <td>${item.code || 'N/A'}</td>
-          <td>${item.description}</td>
-          <td class="right">${item.quantity}</td>
-          <td class="right">${formatCurrency(Number(item.unit_price), order?.currency || currency)}</td>
-          <td class="right">${item.discount}%</td>
-          <td class="right">${item.tax_rate}%</td>
-          <td class="right">${formatCurrency(itemTotal, order?.currency || currency)}</td>
-        </tr>
-      `;
-    }).join('');
+      if (yPosition > 270) {
+        doc.addPage();
+        yPosition = 20;
+      }
 
-    const subtotalTax22 = Number(invoice.subtotal) || 0;
-    const tax22 = Number(invoice.tax_amount) || 0;
-    const discount = Number(invoice.discount_amount) || 0;
-    const total = Number(invoice.total_amount) || 0;
+      doc.text(item.code || 'N/A', 22, yPosition);
+      doc.text(item.description.substring(0, 25), 45, yPosition);
+      doc.text(String(item.quantity), 100, yPosition);
+      doc.text(formatCurrency(Number(item.unit_price), order?.currency || currency), 115, yPosition);
+      doc.text(`${item.discount}%`, 135, yPosition);
+      doc.text(`${item.tax_rate}%`, 155, yPosition);
+      doc.text(formatCurrency(itemTotal, order?.currency || currency), 165, yPosition, { align: 'right' });
 
-    const invoicePdfHtml = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width">
-<title>Factura ${invoice.invoice_number}</title>
-<style>
-  body{margin:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827}
-  .wrapper{width:100%;padding:16px 0}
-  .container{max-width:600px;margin:0 auto;background:#fff;border:1px solid #e5e7eb}
-  .px{padding-left:24px;padding-right:24px}
-  .pt{padding-top:20px}.pb{padding-bottom:20px}
-  .muted{color:#6b7280;font-size:12px}
-  .tag{display:inline-block;padding:2px 8px;border:1px solid #1f2937;border-radius:4px;font-size:12px;font-weight:bold}
-  .h1{font-size:18px;font-weight:700;margin:0}
-  .h2{font-size:14px;font-weight:700;margin:0}
-  .row{display:flex;gap:16px;flex-wrap:wrap}
-  .col{flex:1 1 0}
-  table{width:100%;border-collapse:collapse}
-  th,td{padding:8px;border-bottom:1px solid #e5e7eb;vertical-align:top}
-  th{background:#f9fafb;text-align:left;font-size:12px;color:#374151}
-  td{font-size:13px}
-  .right{text-align:right}
-  .center{text-align:center}
-  .totals td{border:none;padding:6px 8px}
-  .badge{font-size:12px;color:#10b981;font-weight:700}
-  .note{background:#f9fafb;border:1px dashed #d1d5db;padding:10px;font-size:12px;color:#374151}
-  .footer{font-size:11px;color:#6b7280;line-height:1.4}
-  @media print{
-    body{background:#fff}
-    .container{border:none;max-width:800px}
-  }
-</style>
-</head>
-<body>
-<div class="wrapper">
-  <div class="container">
-    <div class="px pt">
-      <div class="row">
-        <div class="col" style="min-width:220px">
-          <p style="margin:6px 0 0" class="muted">
-            <span class="h2">${companyInfo.name}</span><br>
-            RUT: ${companyInfo.rut}<br>
-            ${companyInfo.address}<br>
-            Tel: ${companyInfo.phone} · Email: ${companyInfo.email}
-          </p>
-        </div>
-        <div class="col right" style="min-width:200px">
-          <div class="tag">FACTURA ELECTRÓNICA</div>
-          <p class="h1" style="margin-top:8px">Nº: ${invoice.invoice_number}</p>
-          <p class="muted" style="margin:6px 0 0">
-            Fecha emisión: ${formatDate(invoice.issue_date)}<br>
-            Moneda: ${order?.currency || currency}
-          </p>
-        </div>
-      </div>
-    </div>
+      yPosition += 7;
+    });
 
-    <div class="px">
-      <div class="row" style="margin-top:10px">
-        <div class="col" style="min-width:260px">
-          <p class="h2">Cliente</p>
-          <p style="margin:6px 0 0;font-size:13px">
-            ${client.contact_name}${client.company_name ? ' - ' + client.company_name : ''}<br>
-            ${client.address || ''}<br>
-            ${client.city ? client.city + ', ' : ''}${client.country || ''}<br>
-            Email: ${client.email} · Tel: ${client.phone || 'N/A'}
-          </p>
-        </div>
-        <div class="col" style="min-width:220px">
-          <p class="h2">Condiciones</p>
-          <p style="margin:6px 0 0;font-size:13px">
-            Forma de pago: ${order?.payment_method || 'N/A'}<br>
-            Vencimiento: ${formatDate(invoice.due_date)}<br>
-            Términos: ${order?.payment_terms || 'Contado'}
-          </p>
-        </div>
-      </div>
-    </div>
+    yPosition += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(120, yPosition, 190, yPosition);
 
-    <div class="px pt">
-      <table role="table" aria-label="Detalle">
-        <thead>
-          <tr>
-            <th style="width:16%">Código</th>
-            <th>Descripción</th>
-            <th class="right" style="width:12%">Cant.</th>
-            <th class="right" style="width:16%">P. Unit.</th>
-            <th class="right" style="width:12%">Desc.</th>
-            <th class="right" style="width:12%">IVA %</th>
-            <th class="right" style="width:18%">Importe</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsHtml}
-        </tbody>
-      </table>
-    </div>
+    yPosition += 7;
+    doc.setFontSize(9);
+    doc.text('Subtotal:', 125, yPosition);
+    doc.text(formatCurrency(subtotalTax22, order?.currency || currency), 185, yPosition, { align: 'right' });
 
-    <div class="px pt">
-      <div class="row">
-        <div class="col" style="min-width:260px">
-          <div class="note">
-            <strong>Observaciones:</strong><br>
-            ${invoice.notes || 'N/A'}
-          </div>
-          <p class="muted" style="margin:10px 0 0">
-            Precios expresados en ${order?.currency || currency}.
-          </p>
-        </div>
-        <div class="col" style="min-width:220px">
-          <table class="totals" aria-label="Totales" style="width:100%">
-            <tr><td class="right">Sub-total:</td><td class="right" style="width:34%">${formatCurrency(subtotalTax22, order?.currency || currency)}</td></tr>
-            <tr><td class="right">Descuentos:</td><td class="right">-${formatCurrency(discount, order?.currency || currency)}</td></tr>
-            <tr><td class="right">IVA:</td><td class="right">${formatCurrency(tax22, order?.currency || currency)}</td></tr>
-            <tr><td class="right"><strong>Total:</strong></td><td class="right"><strong>${formatCurrency(total, order?.currency || currency)}</strong></td></tr>
-          </table>
-        </div>
-      </div>
-    </div>
+    yPosition += 6;
+    doc.text('Descuentos:', 125, yPosition);
+    doc.text(`-${formatCurrency(discount, order?.currency || currency)}`, 185, yPosition, { align: 'right' });
 
-    <div class="px pb">
-      <hr style="border:none;border-top:1px solid #e5e7eb">
-      <p class="footer">
-        ${companyInfo.name} · RUT ${companyInfo.rut} · ${companyInfo.address} · ${companyInfo.city}, ${companyInfo.country}<br>
-        Atención al cliente: ${companyInfo.phone} · ${companyInfo.email} · ${companyInfo.web}
-      </p>
-    </div>
-  </div>
-</div>
-</body>
-</html>`;
+    yPosition += 6;
+    doc.text('IVA:', 125, yPosition);
+    doc.text(formatCurrency(tax22, order?.currency || currency), 185, yPosition, { align: 'right' });
+
+    yPosition += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('TOTAL:', 125, yPosition);
+    doc.text(formatCurrency(total, order?.currency || currency), 185, yPosition, { align: 'right' });
+
+    if (invoice.notes) {
+      yPosition += 10;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Observaciones:', 20, yPosition);
+      yPosition += 5;
+      const splitNotes = doc.splitTextToSize(invoice.notes, 170);
+      doc.text(splitNotes, 20, yPosition);
+    }
+
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${companyInfo.name} · RUT ${companyInfo.rut} · ${companyInfo.address} · ${companyInfo.city}, ${companyInfo.country}`, 105, 285, { align: 'center' });
+    doc.text(`Tel: ${companyInfo.phone} · Email: ${companyInfo.email} · Web: ${companyInfo.web}`, 105, 290, { align: 'center' });
+
+    const pdfBuffer = doc.output('arraybuffer');
 
     const emailHtml = `<!DOCTYPE html>
 <html lang="es">
@@ -414,9 +390,9 @@ Deno.serve(async (req: Request) => {
       html: emailHtml,
       attachments: [
         {
-          filename: `Factura_${invoice.invoice_number}.html`,
-          content: invoicePdfHtml,
-          contentType: 'text/html'
+          filename: `Factura_${invoice.invoice_number}.pdf`,
+          content: Buffer.from(pdfBuffer),
+          contentType: 'application/pdf'
         }
       ]
     };
