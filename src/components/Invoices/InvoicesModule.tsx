@@ -101,6 +101,8 @@ export function InvoicesModule() {
   const [items, setItems] = useState<InvoiceItem[]>([
     { description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, subtotal: 0 }
   ]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     loadInvoices();
@@ -522,6 +524,11 @@ export function InvoicesModule() {
     invoice.clients?.contact_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-slate-100 text-slate-700';
@@ -644,7 +651,7 @@ export function InvoicesModule() {
               </tr>
             </thead>
             <tbody>
-              {filteredInvoices.length === 0 ? (
+              {paginatedInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center">
                     <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -653,7 +660,7 @@ export function InvoicesModule() {
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((invoice) => (
+                paginatedInvoices.map((invoice) => (
                   <tr key={invoice.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
                     <td className="py-4 px-4">
                       <div className="flex items-center space-x-2">
@@ -735,6 +742,45 @@ export function InvoicesModule() {
               )}
             </tbody>
           </table>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200">
+              <div className="text-sm text-slate-600">
+                Mostrando {startIndex + 1} a {Math.min(endIndex, filteredInvoices.length)} de {filteredInvoices.length} facturas
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Anterior
+                </button>
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                        currentPage === page
+                          ? 'bg-emerald-600 text-white'
+                          : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
