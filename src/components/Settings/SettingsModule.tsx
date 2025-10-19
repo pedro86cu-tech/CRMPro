@@ -270,7 +270,8 @@ export function SettingsModule() {
         smtp_username: inboxConfig.smtp_username,
         smtp_password: inboxConfig.smtp_password,
         use_ssl: inboxConfig.use_ssl,
-        is_active: inboxConfig.is_active
+        is_active: inboxConfig.is_active,
+        created_by: user.id
       };
 
       let error;
@@ -288,7 +289,11 @@ export function SettingsModule() {
 
       if (error) {
         setSaveStatus('error');
-        toast.error(`Error al guardar: ${error.message}`);
+        if (error.code === '23505') {
+          toast.error('Esta dirección de email ya está registrada en el sistema');
+        } else {
+          toast.error(`Error al guardar: ${error.message}`);
+        }
       } else {
         setSaveStatus('success');
         toast.success('Configuración de buzón guardada correctamente');
