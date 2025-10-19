@@ -393,6 +393,8 @@ export function InvoicesModule() {
 
       let invoiceId: string;
 
+      const previousStatus = editingId ? (invoices.find(inv => inv.id === editingId)?.status) : null;
+
       if (editingId) {
         const { error } = await supabase
           .from('invoices')
@@ -434,6 +436,33 @@ export function InvoicesModule() {
           .insert(itemsToInsert);
 
         if (itemsError) throw itemsError;
+      }
+
+      if (formData.status === 'validated' && previousStatus !== 'validated') {
+        try {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+          const response = await fetch(`${supabaseUrl}/functions/v1/send-invoice-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify({ invoice_id: invoiceId })
+          });
+
+          if (response.ok) {
+            toast.success('Factura enviada por email exitosamente');
+          } else {
+            const error = await response.json();
+            console.error('Error enviando email:', error);
+            toast.error('Factura guardada pero no se pudo enviar el email');
+          }
+        } catch (emailError) {
+          console.error('Error enviando email:', emailError);
+          toast.error('Factura guardada pero no se pudo enviar el email');
+        }
       }
 
       loadInvoices();
