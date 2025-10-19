@@ -83,6 +83,48 @@ export function ClientsModule() {
       loadClients();
     };
     initialize();
+
+    const invoiceChannel = supabase
+      .channel('invoice-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'invoices',
+          filter: 'status=eq.paid'
+        },
+        (payload) => {
+          console.log('[CLIENTS] Invoice paid, updating stats:', payload);
+          if (payload.new && payload.new.client_id) {
+            updateClientStats(payload.new.client_id);
+          }
+        }
+      )
+      .subscribe();
+
+    const orderChannel = supabase
+      .channel('order-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('[CLIENTS] New order created, updating stats:', payload);
+          if (payload.new && payload.new.client_id) {
+            updateClientStats(payload.new.client_id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(invoiceChannel);
+      supabase.removeChannel(orderChannel);
+    };
   }, []);
 
   useEffect(() => {
@@ -134,6 +176,28 @@ export function ClientsModule() {
     }
 
     setClientStats(stats);
+  };
+
+  const updateClientStats = async (clientId: string) => {
+    const [invoices, orders, tickets] = await Promise.all([
+      supabase.from('invoices').select('amount').eq('client_id', clientId).eq('status', 'paid'),
+      supabase.from('orders').select('*', { count: 'exact', head: true }).eq('client_id', clientId),
+      supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('client_id', clientId).in('status', ['open', 'in_progress'])
+    ]);
+
+    const updatedStats = {
+      totalRevenue: invoices.data?.reduce((sum, inv) => sum + Number(inv.amount), 0) || 0,
+      totalOrders: orders.count || 0,
+      totalInvoices: invoices.data?.length || 0,
+      activeTickets: tickets.count || 0
+    };
+
+    setClientStats(prev => ({
+      ...prev,
+      [clientId]: updatedStats
+    }));
+
+    toast?.success('Estadísticas del cliente actualizadas');
   };
 
   const validateForm = () => {
