@@ -391,7 +391,7 @@ Deno.serve(async (req: Request) => {
       attachments: [
         {
           filename: `Factura_${invoice.invoice_number}.pdf`,
-          content: Buffer.from(pdfBuffer),
+          content: new Uint8Array(pdfBuffer),
           contentType: 'application/pdf'
         }
       ]
