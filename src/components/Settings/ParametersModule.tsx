@@ -12,6 +12,7 @@ interface Parameter {
   name: string;
   color?: string;
   symbol?: string;
+  iso_code?: string;
   sort_order?: number;
   is_active: boolean;
   is_default?: boolean;
@@ -31,6 +32,7 @@ const ParametersModule: React.FC = () => {
     name: '',
     color: '#64748b',
     symbol: '',
+    iso_code: '',
     is_active: true,
     is_default: false,
     sort_order: 0
@@ -89,6 +91,7 @@ const ParametersModule: React.FC = () => {
 
       if (hasColor && formData.color) dataToSave.color = formData.color;
       if (hasSymbol && formData.symbol) dataToSave.symbol = formData.symbol;
+      if (hasSymbol && formData.iso_code) dataToSave.iso_code = formData.iso_code;
       if (hasSortOrder) dataToSave.sort_order = formData.sort_order || 0;
       if (hasDefault) dataToSave.is_default = formData.is_default || false;
 
@@ -161,6 +164,7 @@ const ParametersModule: React.FC = () => {
       name: '',
       color: '#64748b',
       symbol: '',
+      iso_code: '',
       is_active: true,
       is_default: false,
       sort_order: 0
@@ -205,18 +209,32 @@ const ParametersModule: React.FC = () => {
         </div>
 
         {hasSymbol && (
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Símbolo
-            </label>
-            <input
-              type="text"
-              value={formData.symbol || ''}
-              onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              placeholder="ej: $, US$"
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Símbolo
+              </label>
+              <input
+                type="text"
+                value={formData.symbol || ''}
+                onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                placeholder="ej: $, US$"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Código ISO (DGI)
+              </label>
+              <input
+                type="text"
+                value={formData.iso_code || ''}
+                onChange={(e) => setFormData({ ...formData, iso_code: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                placeholder="ej: 858, 840"
+              />
+            </div>
+          </>
         )}
 
         {hasColor && (
@@ -359,7 +377,10 @@ const ParametersModule: React.FC = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Código</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Nombre</th>
                     {activeTab === 'currencies' && (
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Símbolo</th>
+                      <>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Símbolo</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">ISO (DGI)</th>
+                      </>
                     )}
                     {['order_statuses', 'payment_statuses', 'invoice_statuses'].includes(activeTab) && (
                       <>
@@ -377,7 +398,10 @@ const ParametersModule: React.FC = () => {
                       <td className="px-4 py-3 text-sm text-slate-900 font-mono">{param.code}</td>
                       <td className="px-4 py-3 text-sm text-slate-900">{param.name}</td>
                       {activeTab === 'currencies' && (
-                        <td className="px-4 py-3 text-sm text-slate-900">{param.symbol}</td>
+                        <>
+                          <td className="px-4 py-3 text-sm text-slate-900">{param.symbol}</td>
+                          <td className="px-4 py-3 text-sm text-slate-900 font-mono">{param.iso_code}</td>
+                        </>
                       )}
                       {['order_statuses', 'payment_statuses', 'invoice_statuses'].includes(activeTab) && (
                         <>

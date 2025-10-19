@@ -593,6 +593,11 @@ export function OrdersModule() {
     }
   };
 
+  const getPaymentMethodLabel = (code: string) => {
+    const method = paymentMethods.find(m => m.code === code);
+    return method ? method.name : code;
+  };
+
   const { subtotal, taxAmount, total } = calculateOrderTotals();
 
   return (
@@ -1464,7 +1469,7 @@ export function OrdersModule() {
                         <CreditCard className="w-4 h-4 mr-1" />
                         Método de Pago:
                       </span>
-                      <p className="font-semibold text-slate-900">{selectedOrder.payment_method}</p>
+                      <p className="font-semibold text-slate-900">{getPaymentMethodLabel(selectedOrder.payment_method)}</p>
                     </div>
                   )}
                 </div>
@@ -1495,7 +1500,7 @@ export function OrdersModule() {
                       <div>
                         <span className="text-sm text-slate-600">Método de Pago:</span>
                         <p className="font-semibold text-slate-900">
-                          {selectedOrder.payment_method}
+                          {getPaymentMethodLabel(selectedOrder.payment_method)}
                         </p>
                       </div>
                     )}
