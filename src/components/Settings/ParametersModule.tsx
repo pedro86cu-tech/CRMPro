@@ -21,7 +21,7 @@ interface Parameter {
 type ParameterType = 'currencies' | 'order_statuses' | 'payment_statuses' | 'item_types' | 'payment_methods' | 'invoice_statuses';
 
 const ParametersModule: React.FC = () => {
-  const { toast } = useToast();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<ParameterType>('currencies');
   const [parameters, setParameters] = useState<Parameter[]>([]);
   const [loading, setLoading] = useState(false);
