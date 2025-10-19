@@ -307,6 +307,7 @@ Deno.serve(async (req: Request) => {
             discount_percent: item.discount_percentage || 0,
             external_product_id: item.id,
             item_type: 'product',
+            currency: 'UYU',
             notes: item.image ? `Imagen: ${item.image}` : ''
           }));
 

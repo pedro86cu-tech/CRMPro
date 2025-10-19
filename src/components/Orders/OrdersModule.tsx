@@ -27,6 +27,7 @@ interface OrderItem {
   discount_percent: number;
   line_total: number;
   notes: string;
+  currency?: string;
 }
 
 interface Order {
@@ -109,7 +110,8 @@ export function OrdersModule() {
     unit_price: 0,
     discount_percent: 0,
     line_total: 0,
-    notes: ''
+    notes: '',
+    currency: 'UYU'
   });
 
   useEffect(() => {
@@ -224,7 +226,8 @@ export function OrdersModule() {
       unit_price: 0,
       discount_percent: 0,
       line_total: 0,
-      notes: ''
+      notes: '',
+      currency: 'UYU'
     });
   };
 
@@ -1036,7 +1039,7 @@ export function OrdersModule() {
                 </h3>
 
                 <div className="bg-white rounded-xl p-4 mb-4 border border-slate-200">
-                  <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
                     <div className="lg:col-span-2">
                       <label className="block text-xs font-semibold text-slate-700 mb-1">Descripción</label>
                       <input
@@ -1080,6 +1083,21 @@ export function OrdersModule() {
                         onChange={(e) => setNewItem({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition text-sm"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Moneda</label>
+                      <select
+                        value={newItem.currency || 'UYU'}
+                        onChange={(e) => setNewItem({ ...newItem, currency: e.target.value })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition text-sm"
+                      >
+                        <option value="UYU">UYU - Peso Uruguayo</option>
+                        <option value="USD">USD - Dólar</option>
+                        <option value="EUR">EUR - Euro</option>
+                        <option value="ARS">ARS - Peso Argentino</option>
+                        <option value="BRL">BRL - Real Brasileño</option>
+                      </select>
                     </div>
 
                     <div>
@@ -1587,13 +1605,13 @@ export function OrdersModule() {
                               </td>
                               <td className="px-4 py-3 text-center text-slate-900">{item.quantity}</td>
                               <td className="px-4 py-3 text-right text-slate-900">
-                                ${item.unit_price.toFixed(2)}
+                                ${item.unit_price.toFixed(2)} {item.currency || 'UYU'}
                               </td>
                               <td className="px-4 py-3 text-center text-slate-900">
                                 {item.discount_percent > 0 ? `${item.discount_percent}%` : '-'}
                               </td>
                               <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                                ${item.line_total.toFixed(2)}
+                                ${item.line_total.toFixed(2)} {item.currency || 'UYU'}
                               </td>
                             </tr>
                           );
