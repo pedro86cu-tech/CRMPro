@@ -86,14 +86,25 @@ const ParametersModule: React.FC = () => {
       const dataToSave: any = {
         code: formData.code,
         name: formData.name,
-        is_active: formData.is_active
+        is_active: formData.is_active ?? true
       };
 
-      if (hasColor && formData.color) dataToSave.color = formData.color;
-      if (hasSymbol && formData.symbol) dataToSave.symbol = formData.symbol;
-      if (hasSymbol && formData.iso_code) dataToSave.iso_code = formData.iso_code;
-      if (hasSortOrder) dataToSave.sort_order = formData.sort_order || 0;
-      if (hasDefault) dataToSave.is_default = formData.is_default || false;
+      if (hasColor) {
+        dataToSave.color = formData.color || '#64748b';
+      }
+
+      if (hasSymbol) {
+        if (formData.symbol) dataToSave.symbol = formData.symbol;
+        if (formData.iso_code) dataToSave.iso_code = formData.iso_code;
+      }
+
+      if (hasSortOrder) {
+        dataToSave.sort_order = formData.sort_order ?? 0;
+      }
+
+      if (hasDefault) {
+        dataToSave.is_default = formData.is_default ?? false;
+      }
 
       if (editingId) {
         dataToSave.updated_at = new Date().toISOString();
@@ -116,7 +127,9 @@ const ParametersModule: React.FC = () => {
       resetForm();
       loadParameters();
     } catch (error: any) {
-      toast.error('Error al guardar: ' + error.message);
+      const errorMessage = error?.message || error?.toString() || 'Error desconocido';
+      console.error('[PARAMETERS] Error saving:', error);
+      toast.error('Error al guardar: ' + errorMessage);
     }
   };
 
