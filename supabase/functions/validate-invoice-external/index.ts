@@ -235,6 +235,7 @@ Deno.serve(async (req: Request) => {
         status: "validated",
         validated_at: new Date().toISOString(),
         validation_response: responsePayload,
+        pending_validation: false,
         updated_at: new Date().toISOString()
       };
 
@@ -266,6 +267,31 @@ Deno.serve(async (req: Request) => {
       if (responseMapping.qr_code) {
         const qrCode = getNestedValue({ response: responsePayload }, responseMapping.qr_code);
         if (qrCode) updateData.qr_code = qrCode;
+      }
+
+      if (responseMapping.dgi_estado) {
+        const dgiEstado = getNestedValue({ response: responsePayload }, responseMapping.dgi_estado);
+        if (dgiEstado) updateData.dgi_estado = dgiEstado;
+      }
+
+      if (responseMapping.dgi_codigo_autorizacion) {
+        const dgiCodigoAutorizacion = getNestedValue({ response: responsePayload }, responseMapping.dgi_codigo_autorizacion);
+        if (dgiCodigoAutorizacion) updateData.dgi_codigo_autorizacion = dgiCodigoAutorizacion;
+      }
+
+      if (responseMapping.dgi_mensaje) {
+        const dgiMensaje = getNestedValue({ response: responsePayload }, responseMapping.dgi_mensaje);
+        if (dgiMensaje) updateData.dgi_mensaje = dgiMensaje;
+      }
+
+      if (responseMapping.dgi_id_efactura) {
+        const dgiIdEfactura = getNestedValue({ response: responsePayload }, responseMapping.dgi_id_efactura);
+        if (dgiIdEfactura) updateData.dgi_id_efactura = dgiIdEfactura;
+      }
+
+      if (responseMapping.dgi_fecha_validacion) {
+        const dgiFechaValidacion = getNestedValue({ response: responsePayload }, responseMapping.dgi_fecha_validacion);
+        if (dgiFechaValidacion) updateData.dgi_fecha_validacion = dgiFechaValidacion;
       }
 
       console.log("Actualizando factura con datos de validación:", updateData);

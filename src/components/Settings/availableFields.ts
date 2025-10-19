@@ -165,6 +165,31 @@ export const RESPONSE_AVAILABLE_FIELDS = [
     description: 'Datos para código QR'
   },
   {
+    value: 'dgi_estado',
+    label: 'Estado DGI',
+    description: 'Estado de validación (aprobado, rechazado, pendiente)'
+  },
+  {
+    value: 'dgi_codigo_autorizacion',
+    label: 'Código Autorización DGI',
+    description: 'Código de autorización completo de DGI'
+  },
+  {
+    value: 'dgi_mensaje',
+    label: 'Mensaje DGI',
+    description: 'Mensaje descriptivo de la respuesta'
+  },
+  {
+    value: 'dgi_id_efactura',
+    label: 'ID eFactura DGI',
+    description: 'ID único asignado por DGI'
+  },
+  {
+    value: 'dgi_fecha_validacion',
+    label: 'Fecha Validación DGI',
+    description: 'Fecha/hora de validación según DGI'
+  },
+  {
     value: 'approved',
     label: 'Aprobado (boolean)',
     description: 'Si la factura fue aprobada (true/false)'
@@ -203,14 +228,13 @@ export const DGI_URUGUAY_TEMPLATE = {
     'iva': 'invoice.tax_amount',
   },
   response: {
-    'approved': 'response.aprobado',
+    'approved': 'response.success',
+    'dgi_estado': 'response.estado',
+    'dgi_codigo_autorizacion': 'response.codigo_autorizacion',
     'numero_cfe': 'response.numero_cfe',
     'serie_cfe': 'response.serie',
-    'tipo_cfe': 'response.tipo_cfe',
-    'cae': 'response.cae',
-    'vencimiento_cae': 'response.vencimiento_cae',
-    'qr_code': 'response.qr_data',
-    'reference': 'response.id_transaccion',
-    'message': 'response.mensaje',
+    'dgi_fecha_validacion': 'response.fecha_validacion',
+    'dgi_mensaje': 'response.mensaje',
+    'dgi_id_efactura': 'response.id_efactura',
   }
 };
