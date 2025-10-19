@@ -490,6 +490,27 @@ export function OrdersModule() {
         return;
       }
 
+      for (const item of selectedOrderItems) {
+        if (item.id) {
+          const { error: itemError } = await supabase
+            .from('order_items')
+            .update({
+              description: item.description,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              discount_percent: item.discount_percent,
+              line_total: item.line_total,
+              total_price: item.line_total,
+              notes: item.notes || ''
+            })
+            .eq('id', item.id);
+
+          if (itemError) {
+            console.error('Error updating item:', itemError);
+          }
+        }
+      }
+
       toast.success('Orden actualizada correctamente');
       setShowEditModal(false);
       loadOrders();
@@ -2070,6 +2091,81 @@ export function OrdersModule() {
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
                     />
                   </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                  <ShoppingCart className="w-5 h-5 mr-2 text-purple-600" />
+                  Items de la Orden
+                </h3>
+                <div className="space-y-3">
+                  {selectedOrderItems.map((item, index) => (
+                    <div key={item.id || index} className="bg-white p-4 rounded-lg border border-slate-200">
+                      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                        <div className="lg:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Descripción
+                          </label>
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) => {
+                              const updated = [...selectedOrderItems];
+                              updated[index].description = e.target.value;
+                              setSelectedOrderItems(updated);
+                            }}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Cantidad
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const updated = [...selectedOrderItems];
+                              updated[index].quantity = parseFloat(e.target.value);
+                              updated[index].line_total = updated[index].quantity * updated[index].unit_price * (1 - updated[index].discount_percent / 100);
+                              setSelectedOrderItems(updated);
+                            }}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Precio Unit.
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.unit_price}
+                            onChange={(e) => {
+                              const updated = [...selectedOrderItems];
+                              updated[index].unit_price = parseFloat(e.target.value);
+                              updated[index].line_total = updated[index].quantity * updated[index].unit_price * (1 - updated[index].discount_percent / 100);
+                              setSelectedOrderItems(updated);
+                            }}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Total
+                          </label>
+                          <input
+                            type="text"
+                            value={item.line_total.toFixed(2)}
+                            readOnly
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-100 font-semibold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
