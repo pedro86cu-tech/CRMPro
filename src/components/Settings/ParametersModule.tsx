@@ -73,13 +73,27 @@ const ParametersModule: React.FC = () => {
     }
 
     try {
+      const hasColor = ['order_statuses', 'payment_statuses', 'invoice_statuses'].includes(activeTab);
+      const hasSymbol = activeTab === 'currencies';
+      const hasSortOrder = ['order_statuses', 'payment_statuses', 'invoice_statuses'].includes(activeTab);
+      const hasDefault = activeTab === 'currencies';
+
+      const dataToSave: any = {
+        code: formData.code,
+        name: formData.name,
+        is_active: formData.is_active
+      };
+
+      if (hasColor && formData.color) dataToSave.color = formData.color;
+      if (hasSymbol && formData.symbol) dataToSave.symbol = formData.symbol;
+      if (hasSortOrder) dataToSave.sort_order = formData.sort_order || 0;
+      if (hasDefault) dataToSave.is_default = formData.is_default || false;
+
       if (editingId) {
+        dataToSave.updated_at = new Date().toISOString();
         const { error } = await supabase
           .from(activeTab)
-          .update({
-            ...formData,
-            updated_at: new Date().toISOString()
-          })
+          .update(dataToSave)
           .eq('id', editingId);
 
         if (error) throw error;
@@ -87,7 +101,7 @@ const ParametersModule: React.FC = () => {
       } else {
         const { error } = await supabase
           .from(activeTab)
-          .insert([formData]);
+          .insert([dataToSave]);
 
         if (error) throw error;
         toast.success('Parámetro creado correctamente');
