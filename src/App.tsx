@@ -21,6 +21,7 @@ import { InboxModule } from './components/Inbox/InboxModule';
 import { SettingsModule } from './components/Settings/SettingsModule';
 import { AccountingModule } from './components/Accounting/AccountingModule';
 import ParametersModule from './components/Settings/ParametersModule';
+import { ExternalValidationModule } from './components/Settings/ExternalValidationModule';
 import { useTwilioDevice } from './hooks/useTwilioDevice';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -80,6 +81,8 @@ function MainApp() {
         return <AccountingModule />;
       case 'parameters':
         return <ParametersModule />;
+      case 'validation':
+        return <ExternalValidationModule />;
       default:
         return <DashboardModule />;
     }

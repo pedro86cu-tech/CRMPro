@@ -13,7 +13,8 @@ import {
   DollarSign,
   Menu,
   X,
-  User
+  User,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -32,6 +33,7 @@ const menuItems = [
   { id: 'calls', label: 'Llamadas', icon: Phone },
   { id: 'tickets', label: 'Tickets', icon: Ticket },
   { id: 'inbox', label: 'Buzón', icon: Inbox },
+  { id: 'validation', label: 'Validación Ext.', icon: Shield },
   { id: 'parameters', label: 'Parámetros', icon: Settings },
   { id: 'settings', label: 'Configuración', icon: Settings },
 ];
