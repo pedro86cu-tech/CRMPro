@@ -52,10 +52,13 @@ const ParametersModule: React.FC = () => {
   const loadParameters = async () => {
     setLoading(true);
     try {
+      const hasSortOrder = ['order_statuses', 'payment_statuses', 'invoice_statuses'].includes(activeTab);
+      const orderBy = hasSortOrder ? 'sort_order' : 'code';
+
       const { data, error } = await supabase
         .from(activeTab)
         .select('*')
-        .order('sort_order', { ascending: true });
+        .order(orderBy, { ascending: true });
 
       if (error) throw error;
       setParameters(data || []);
