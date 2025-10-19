@@ -156,7 +156,8 @@ Deno.serve(async (req: Request) => {
       country: settings.company_country || "Uruguay",
       phone: settings.company_phone || "+598 00 000 000",
       email: settings.company_email || smtp.username,
-      web: settings.company_website || "www.miempresa.com"
+      web: settings.company_website || "www.miempresa.com",
+      logo_url: settings.company_logo_url || ""
     };
 
     const subtotalTax22 = Number(invoice.subtotal) || 0;
@@ -166,67 +167,106 @@ Deno.serve(async (req: Request) => {
 
     const doc = new jsPDF();
 
+    let logoYOffset = 0;
+    if (companyInfo.logo_url) {
+      try {
+        const logoResponse = await fetch(companyInfo.logo_url);
+        const logoBlob = await logoResponse.blob();
+        const logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+        doc.addImage(logoBase64, 'PNG', 20, 15, 30, 30);
+        logoYOffset = 35;
+      } catch (e) {
+        logoYOffset = 0;
+      }
+    }
+
+    const startY = logoYOffset || 20;
+
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text(companyInfo.name, 20, 20);
+    doc.setTextColor(72, 156, 156);
+    doc.text(companyInfo.name, logoYOffset ? 55 : 20, startY);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`RUT: ${companyInfo.rut}`, 20, 27);
-    doc.text(`${companyInfo.address}`, 20, 32);
-    doc.text(`${companyInfo.city}, ${companyInfo.country}`, 20, 37);
-    doc.text(`Tel: ${companyInfo.phone}`, 20, 42);
-    doc.text(`Email: ${companyInfo.email}`, 20, 47);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`RUT: ${companyInfo.rut}`, logoYOffset ? 55 : 20, startY + 7);
+    doc.text(`${companyInfo.address}`, logoYOffset ? 55 : 20, startY + 12);
+    doc.text(`${companyInfo.city}, ${companyInfo.country}`, logoYOffset ? 55 : 20, startY + 17);
+    doc.text(`Tel: ${companyInfo.phone}`, logoYOffset ? 55 : 20, startY + 22);
+    doc.text(`Email: ${companyInfo.email}`, logoYOffset ? 55 : 20, startY + 27);
 
-    doc.setFontSize(14);
+    doc.setFillColor(72, 156, 156);
+    doc.rect(140, startY - 8, 50, 12, 'F');
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('FACTURA ELECTRÓNICA', 140, 20);
+    doc.setTextColor(255, 255, 255);
+    doc.text('FACTURA', 165, startY - 1, { align: 'center' });
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Nº: ${invoice.invoice_number}`, 140, 27);
-    doc.text(`Fecha: ${formatDate(invoice.issue_date)}`, 140, 32);
-    doc.text(`Vencimiento: ${formatDate(invoice.due_date)}`, 140, 37);
-    doc.text(`Moneda: ${order?.currency || currency}`, 140, 42);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Nº: ${invoice.invoice_number}`, 140, startY + 7);
+    doc.text(`Fecha: ${formatDate(invoice.issue_date)}`, 140, startY + 12);
+    doc.text(`Vencimiento: ${formatDate(invoice.due_date)}`, 140, startY + 17);
+    doc.text(`Moneda: ${order?.currency || currency}`, 140, startY + 22);
 
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, 52, 190, 52);
+    const lineY = Math.max(52, startY + 35);
+    doc.setDrawColor(72, 156, 156);
+    doc.setLineWidth(0.5);
+    doc.line(20, lineY, 190, lineY);
 
+    const clientY = lineY + 8;
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('CLIENTE', 20, 60);
+    doc.setTextColor(72, 156, 156);
+    doc.text('CLIENTE', 20, clientY);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(client.contact_name, 20, 67);
+    doc.setTextColor(60, 60, 60);
+    doc.text(client.contact_name, 20, clientY + 7);
     if (client.company_name) {
-      doc.text(client.company_name, 20, 72);
+      doc.text(client.company_name, 20, clientY + 12);
     }
     if (client.address) {
-      doc.text(client.address, 20, client.company_name ? 77 : 72);
+      doc.text(client.address, 20, client.company_name ? clientY + 17 : clientY + 12);
     }
-    doc.text(`Email: ${client.email}`, 20, client.company_name ? 82 : 77);
+    doc.text(`Email: ${client.email}`, 20, client.company_name ? clientY + 22 : clientY + 17);
     if (client.phone) {
-      doc.text(`Tel: ${client.phone}`, 20, client.company_name ? 87 : 82);
+      doc.text(`Tel: ${client.phone}`, 20, client.company_name ? clientY + 27 : clientY + 22);
     }
 
-    let yPosition = 100;
+    let yPosition = clientY + 38;
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.setFillColor(249, 250, 251);
+    doc.setFillColor(72, 156, 156);
     doc.rect(20, yPosition, 170, 8, 'F');
-    doc.text('Código', 22, yPosition + 5);
-    doc.text('Descripción', 45, yPosition + 5);
-    doc.text('Cant', 100, yPosition + 5);
-    doc.text('P.Unit', 115, yPosition + 5);
-    doc.text('Desc%', 135, yPosition + 5);
-    doc.text('IVA%', 155, yPosition + 5);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Descripción', 22, yPosition + 5);
+    doc.text('Cant', 115, yPosition + 5);
+    doc.text('P.Unit', 135, yPosition + 5);
+    doc.text('Desc%', 155, yPosition + 5);
     doc.text('Total', 175, yPosition + 5);
 
     yPosition += 10;
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+
+    const formatPrice = (amount: number, curr: string = currency) => {
+      return new Intl.NumberFormat('es-UY', {
+        style: 'currency',
+        currency: curr,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
+    };
 
     (invoiceItems || []).forEach((item: any) => {
       const itemSubtotal = Number(item.quantity) * Number(item.unit_price);
@@ -240,55 +280,53 @@ Deno.serve(async (req: Request) => {
         yPosition = 20;
       }
 
-      doc.text(item.code || 'N/A', 22, yPosition);
-      doc.text(item.description.substring(0, 25), 45, yPosition);
-      doc.text(String(item.quantity), 100, yPosition);
-      doc.text(formatCurrency(Number(item.unit_price), order?.currency || currency), 115, yPosition);
-      doc.text(`${item.discount}%`, 135, yPosition);
-      doc.text(`${item.tax_rate}%`, 155, yPosition);
-      doc.text(formatCurrency(itemTotal, order?.currency || currency), 165, yPosition, { align: 'right' });
+      doc.text(item.description.substring(0, 50), 22, yPosition);
+      doc.text(String(item.quantity), 115, yPosition);
+      doc.text(formatPrice(Number(item.unit_price), order?.currency || currency), 135, yPosition);
+      doc.text(`${item.discount}%`, 155, yPosition);
+      doc.text(formatPrice(itemTotal, order?.currency || currency), 185, yPosition, { align: 'right' });
 
       yPosition += 7;
     });
 
     yPosition += 10;
-    doc.setDrawColor(200, 200, 200);
+    doc.setDrawColor(72, 156, 156);
+    doc.setLineWidth(0.5);
     doc.line(120, yPosition, 190, yPosition);
 
     yPosition += 7;
-    doc.setFontSize(9);
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
     doc.text('Subtotal:', 125, yPosition);
-    doc.text(formatCurrency(subtotalTax22, order?.currency || currency), 185, yPosition, { align: 'right' });
+    doc.text(formatPrice(subtotalTax22, order?.currency || currency), 185, yPosition, { align: 'right' });
 
     yPosition += 6;
     doc.text('Descuentos:', 125, yPosition);
-    doc.text(`-${formatCurrency(discount, order?.currency || currency)}`, 185, yPosition, { align: 'right' });
+    doc.text(`-${formatPrice(discount, order?.currency || currency)}`, 185, yPosition, { align: 'right' });
 
     yPosition += 6;
     doc.text('IVA:', 125, yPosition);
-    doc.text(formatCurrency(tax22, order?.currency || currency), 185, yPosition, { align: 'right' });
+    doc.text(formatPrice(tax22, order?.currency || currency), 185, yPosition, { align: 'right' });
 
-    yPosition += 8;
+    yPosition += 10;
+    doc.setFillColor(72, 156, 156);
+    doc.rect(120, yPosition - 6, 70, 10, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(12);
+    doc.setTextColor(255, 255, 255);
     doc.text('TOTAL:', 125, yPosition);
-    doc.text(formatCurrency(total, order?.currency || currency), 185, yPosition, { align: 'right' });
+    doc.text(formatPrice(total, order?.currency || currency), 185, yPosition, { align: 'right' });
 
-    if (invoice.notes) {
-      yPosition += 10;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.text('Observaciones:', 20, yPosition);
-      yPosition += 5;
-      const splitNotes = doc.splitTextToSize(invoice.notes, 170);
-      doc.text(splitNotes, 20, yPosition);
-    }
+    doc.setDrawColor(72, 156, 156);
+    doc.setLineWidth(0.5);
+    doc.line(20, 280, 190, 280);
 
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text(`${companyInfo.name} · RUT ${companyInfo.rut} · ${companyInfo.address} · ${companyInfo.city}, ${companyInfo.country}`, 105, 285, { align: 'center' });
-    doc.text(`Tel: ${companyInfo.phone} · Email: ${companyInfo.email} · Web: ${companyInfo.web}`, 105, 290, { align: 'center' });
+    doc.setTextColor(72, 156, 156);
+    doc.text(`${companyInfo.name} · RUT ${companyInfo.rut}`, 105, 285, { align: 'center' });
+    doc.text(`${companyInfo.address} · ${companyInfo.city}, ${companyInfo.country}`, 105, 289, { align: 'center' });
+    doc.text(`Tel: ${companyInfo.phone} · Email: ${companyInfo.email} · Web: ${companyInfo.web}`, 105, 293, { align: 'center' });
 
     const pdfBuffer = doc.output('arraybuffer');
 

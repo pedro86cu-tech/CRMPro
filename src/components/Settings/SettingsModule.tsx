@@ -39,6 +39,7 @@ export function SettingsModule() {
     company_phone: '',
     company_email: '',
     company_website: '',
+    company_logo_url: '',
     timezone: 'America/Mexico_City',
     currency: 'MXN',
     date_format: 'DD/MM/YYYY'
@@ -733,6 +734,18 @@ export function SettingsModule() {
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="https://ejemplo.com"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Logo URL</label>
+                <input
+                  type="url"
+                  value={generalSettings.company_logo_url}
+                  onChange={(e) => setGeneralSettings({ ...generalSettings, company_logo_url: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="https://ejemplo.com/logo.png"
+                />
+                <p className="mt-1 text-sm text-slate-500">URL pública del logo de tu empresa (PNG, JPG, SVG)</p>
               </div>
 
               <div>
