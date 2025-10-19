@@ -1375,39 +1375,19 @@ export function OrdersModule() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        <CreditCard className="w-4 h-4 inline mr-2 text-blue-600" />
-                        Términos de Pago
-                      </label>
-                      <select
-                        value={formData.payment_terms}
-                        onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                      >
-                        <option value="Inmediato">Inmediato</option>
-                        <option value="Net 15">Net 15</option>
-                        <option value="Net 30">Net 30</option>
-                        <option value="Net 60">Net 60</option>
-                        <option value="Net 90">Net 90</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Estado de Pago
-                      </label>
-                      <select
-                        value={formData.payment_status}
-                        onChange={(e) => setFormData({ ...formData, payment_status: e.target.value as any })}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Estado de Pago
+                    </label>
+                    <select
+                      value={formData.payment_status}
+                      onChange={(e) => setFormData({ ...formData, payment_status: e.target.value as any })}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                       >
                         {paymentStatuses.map((status) => (
                           <option key={status.code} value={status.code}>{status.name}</option>
                         ))}
                       </select>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1526,10 +1506,6 @@ export function OrdersModule() {
                       </p>
                     </div>
                   )}
-                  <div>
-                    <span className="text-sm text-slate-600">Términos de Pago:</span>
-                    <p className="font-semibold text-slate-900">{selectedOrder.payment_terms}</p>
-                  </div>
                   {selectedOrder.payment_method && (
                     <div>
                       <span className="text-sm text-slate-600 flex items-center">
@@ -1941,31 +1917,17 @@ export function OrdersModule() {
                   <CreditCard className="w-5 h-5 mr-2 text-emerald-600" />
                   Información de Pago
                 </h3>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Método de Pago
-                    </label>
-                    <input
-                      type="text"
-                      value={editFormData.payment_method}
-                      onChange={(e) => setEditFormData({ ...editFormData, payment_method: e.target.value })}
-                      placeholder="ej: Mercado Pago, Stripe, Transferencia"
-                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Términos de Pago
-                    </label>
-                    <input
-                      type="text"
-                      value={editFormData.payment_terms}
-                      onChange={(e) => setEditFormData({ ...editFormData, payment_terms: e.target.value })}
-                      placeholder="ej: Net 30, Inmediato"
-                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Método de Pago
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.payment_method}
+                    onChange={(e) => setEditFormData({ ...editFormData, payment_method: e.target.value })}
+                    placeholder="ej: Mercado Pago, Stripe, Transferencia"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  />
                 </div>
               </div>
 
