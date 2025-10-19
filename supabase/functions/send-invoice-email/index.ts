@@ -113,37 +113,49 @@ Deno.serve(async (req: Request) => {
     const client = invoice.clients;
     const order = invoice.orders;
 
-    const formatCurrency = (amount: number, currency: string = "USD") => {
+    const { data: generalSettings } = await supabase
+      .from("system_settings")
+      .select("setting_value")
+      .eq("setting_key", "general_settings")
+      .single();
+
+    const settings = generalSettings?.setting_value || {};
+    const timezone = settings.timezone || 'America/Montevideo';
+    const dateFormat = settings.date_format || 'DD/MM/YYYY';
+    const currency = settings.currency || 'USD';
+
+    const formatCurrency = (amount: number, curr: string = currency) => {
       return new Intl.NumberFormat('es-UY', {
         style: 'currency',
-        currency: currency,
+        currency: curr,
         minimumFractionDigits: 2
       }).format(amount);
     };
 
     const formatDate = (date: string) => {
-      return new Date(date).toLocaleDateString('es-UY', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      });
+      const d = new Date(date);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+
+      if (dateFormat === 'MM/DD/YYYY') {
+        return `${month}/${day}/${year}`;
+      } else if (dateFormat === 'YYYY-MM-DD') {
+        return `${year}-${month}-${day}`;
+      } else {
+        return `${day}/${month}/${year}`;
+      }
     };
 
-    const { data: companySettings } = await supabase
-      .from("system_settings")
-      .select("setting_value")
-      .eq("setting_key", "company_info")
-      .single();
-
-    const companyInfo = companySettings?.setting_value || {
-      name: "Mi Empresa",
-      rut: "000000000",
-      address: "Dirección no configurada",
-      city: "Montevideo",
-      country: "Uruguay",
-      phone: "+598 00 000 000",
-      email: smtp.username,
-      web: "www.miempresa.com"
+    const companyInfo = {
+      name: settings.company_name || "Mi Empresa",
+      rut: settings.company_rut || "000000000",
+      address: settings.company_address || "Dirección no configurada",
+      city: settings.company_city || "Montevideo",
+      country: settings.company_country || "Uruguay",
+      phone: settings.company_phone || "+598 00 000 000",
+      email: settings.company_email || smtp.username,
+      web: settings.company_website || "www.miempresa.com"
     };
 
     const itemsHtml = (invoiceItems || []).map((item: any) => {
@@ -155,13 +167,13 @@ Deno.serve(async (req: Request) => {
 
       return `
         <tr>
-          <td>${item.description}</td>
+          <td>${item.code || 'N/A'}</td>
           <td>${item.description}</td>
           <td class="right">${item.quantity}</td>
-          <td class="right">${formatCurrency(Number(item.unit_price), order?.currency || 'USD')}</td>
+          <td class="right">${formatCurrency(Number(item.unit_price), order?.currency || currency)}</td>
           <td class="right">${item.discount}%</td>
           <td class="right">${item.tax_rate}%</td>
-          <td class="right">${formatCurrency(itemTotal, order?.currency || 'USD')}</td>
+          <td class="right">${formatCurrency(itemTotal, order?.currency || currency)}</td>
         </tr>
       `;
     }).join('');
@@ -223,7 +235,7 @@ Deno.serve(async (req: Request) => {
           <p class="h1" style="margin-top:8px">Nº: ${invoice.invoice_number}</p>
           <p class="muted" style="margin:6px 0 0">
             Fecha emisión: ${formatDate(invoice.issue_date)}<br>
-            Moneda: ${order?.currency || 'USD'}
+            Moneda: ${order?.currency || currency}
           </p>
         </div>
       </div>
@@ -278,15 +290,15 @@ Deno.serve(async (req: Request) => {
             ${invoice.notes || 'N/A'}
           </div>
           <p class="muted" style="margin:10px 0 0">
-            Precios expresados en ${order?.currency || 'USD'}.
+            Precios expresados en ${order?.currency || currency}.
           </p>
         </div>
         <div class="col" style="min-width:220px">
           <table class="totals" aria-label="Totales" style="width:100%">
-            <tr><td class="right">Sub-total:</td><td class="right" style="width:34%">${formatCurrency(subtotalTax22, order?.currency || 'USD')}</td></tr>
-            <tr><td class="right">Descuentos:</td><td class="right">-${formatCurrency(discount, order?.currency || 'USD')}</td></tr>
-            <tr><td class="right">IVA:</td><td class="right">${formatCurrency(tax22, order?.currency || 'USD')}</td></tr>
-            <tr><td class="right"><strong>Total:</strong></td><td class="right"><strong>${formatCurrency(total, order?.currency || 'USD')}</strong></td></tr>
+            <tr><td class="right">Sub-total:</td><td class="right" style="width:34%">${formatCurrency(subtotalTax22, order?.currency || currency)}</td></tr>
+            <tr><td class="right">Descuentos:</td><td class="right">-${formatCurrency(discount, order?.currency || currency)}</td></tr>
+            <tr><td class="right">IVA:</td><td class="right">${formatCurrency(tax22, order?.currency || currency)}</td></tr>
+            <tr><td class="right"><strong>Total:</strong></td><td class="right"><strong>${formatCurrency(total, order?.currency || currency)}</strong></td></tr>
           </table>
         </div>
       </div>
@@ -373,7 +385,7 @@ Deno.serve(async (req: Request) => {
     </p>
 
     <p>
-      El total de la factura asciende a <strong>${formatCurrency(total, order?.currency || 'USD')}</strong>.
+      El total de la factura asciende a <strong>${formatCurrency(total, order?.currency || currency)}</strong>.
     </p>
 
     <p>
@@ -402,7 +414,7 @@ Deno.serve(async (req: Request) => {
       html: emailHtml,
       attachments: [
         {
-          filename: `Factura_${invoice.invoice_number}.pdf`,
+          filename: `Factura_${invoice.invoice_number}.html`,
           content: invoicePdfHtml,
           contentType: 'text/html'
         }

@@ -32,6 +32,12 @@ export function SettingsModule() {
 
   const [generalSettings, setGeneralSettings] = useState({
     company_name: '',
+    company_rut: '',
+    company_address: '',
+    company_city: '',
+    company_country: '',
+    company_phone: '',
+    company_email: '',
     company_website: '',
     timezone: 'America/Mexico_City',
     currency: 'MXN',
@@ -624,6 +630,72 @@ export function SettingsModule() {
                   onChange={(e) => setGeneralSettings({ ...generalSettings, company_name: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="Mi Empresa"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">RUT / NIT / RFC</label>
+                <input
+                  type="text"
+                  value={generalSettings.company_rut}
+                  onChange={(e) => setGeneralSettings({ ...generalSettings, company_rut: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="000000000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Dirección</label>
+                <input
+                  type="text"
+                  value={generalSettings.company_address}
+                  onChange={(e) => setGeneralSettings({ ...generalSettings, company_address: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Calle Principal 123"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Ciudad</label>
+                <input
+                  type="text"
+                  value={generalSettings.company_city}
+                  onChange={(e) => setGeneralSettings({ ...generalSettings, company_city: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Montevideo"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">País</label>
+                <input
+                  type="text"
+                  value={generalSettings.company_country}
+                  onChange={(e) => setGeneralSettings({ ...generalSettings, company_country: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Uruguay"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Teléfono</label>
+                <input
+                  type="tel"
+                  value={generalSettings.company_phone}
+                  onChange={(e) => setGeneralSettings({ ...generalSettings, company_phone: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="+598 00 000 000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={generalSettings.company_email}
+                  onChange={(e) => setGeneralSettings({ ...generalSettings, company_email: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="contacto@miempresa.com"
                 />
               </div>
 
