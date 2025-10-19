@@ -301,20 +301,27 @@ Deno.serve(async (req: Request) => {
         console.log("✓ Orden creada:", order.id);
 
         if (orderData.items && orderData.items.length > 0) {
-          const orderItems = orderData.items.map((item) => ({
-            order_id: order.id,
-            product_name: item.name,
-            description: `${item.name} - ${item.partnerName}`,
-            quantity: item.quantity,
-            unit_price: item.price,
-            line_total: item.quantity * item.price,
-            total_price: item.quantity * item.price,
-            discount_percent: item.discount_percentage || 0,
-            external_product_id: item.id,
-            item_type: 'product',
-            currency: item.currency || 'UYU',
-            notes: item.image ? `Imagen: ${item.image}` : ''
-          }));
+          const orderItems = orderData.items.map((item) => {
+            const unitPrice = item.original_price || item.price;
+            const discountPercent = item.discount_percentage || 0;
+            const priceAfterDiscount = unitPrice * (1 - discountPercent / 100);
+            const lineTotal = item.quantity * priceAfterDiscount;
+
+            return {
+              order_id: order.id,
+              product_name: item.name,
+              description: `${item.name} - ${item.partnerName}`,
+              quantity: item.quantity,
+              unit_price: unitPrice,
+              line_total: lineTotal,
+              total_price: lineTotal,
+              discount_percent: discountPercent,
+              external_product_id: item.id,
+              item_type: 'product',
+              currency: item.currency || 'UYU',
+              notes: item.image ? `Imagen: ${item.image}` : ''
+            };
+          });
 
           const { error: itemsError } = await supabase
             .from("order_items")
