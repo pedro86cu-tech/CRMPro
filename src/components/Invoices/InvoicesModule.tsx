@@ -25,7 +25,7 @@ interface Invoice {
   order_id?: string;
   issue_date: string;
   due_date: string;
-  status: 'draft' | 'validated' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  status: string;
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
@@ -59,10 +59,19 @@ interface InvoiceItemDB {
   subtotal: number;
 }
 
+interface InvoiceStatus {
+  code: string;
+  name: string;
+  color: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
 export function InvoicesModule() {
   const toast = useToast();
   const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoiceStatuses, setInvoiceStatuses] = useState<InvoiceStatus[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -93,7 +102,7 @@ export function InvoicesModule() {
     order_id: '',
     issue_date: new Date().toISOString().split('T')[0],
     due_date: '',
-    status: 'draft' as const,
+    status: 'draft',
     notes: '',
     terms: 'Pago a 30 días. Penalización por retraso del 2% mensual.'
   });
@@ -105,11 +114,29 @@ export function InvoicesModule() {
   const [itemsPerPage] = useState(10);
 
   useEffect(() => {
+    loadInvoiceStatuses();
     loadInvoices();
     loadClients();
     loadOrders();
     generateInvoiceNumber();
   }, []);
+
+  const loadInvoiceStatuses = async () => {
+    const { data, error } = await supabase
+      .from('invoice_statuses')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order');
+
+    if (error) {
+      console.error('Error loading invoice statuses:', error);
+      return;
+    }
+
+    if (data) {
+      setInvoiceStatuses(data);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -529,28 +556,25 @@ export function InvoicesModule() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'draft': return 'bg-slate-100 text-slate-700';
-      case 'validated': return 'bg-cyan-100 text-cyan-700';
-      case 'sent': return 'bg-blue-100 text-blue-700';
-      case 'paid': return 'bg-emerald-100 text-emerald-700';
-      case 'overdue': return 'bg-red-100 text-red-700';
-      case 'cancelled': return 'bg-gray-100 text-gray-700';
-      default: return 'bg-slate-100 text-slate-700';
+  const getStatusStyle = (status: string) => {
+    const statusConfig = invoiceStatuses.find(s => s.code === status);
+    if (statusConfig && statusConfig.color) {
+      return {
+        backgroundColor: `${statusConfig.color}15`,
+        color: statusConfig.color,
+        borderColor: `${statusConfig.color}40`
+      };
     }
+    return {
+      backgroundColor: '#f1f5f9',
+      color: '#475569',
+      borderColor: '#e2e8f0'
+    };
   };
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'draft': return 'Borrador';
-      case 'validated': return 'Validada';
-      case 'sent': return 'Enviada';
-      case 'paid': return 'Pagada';
-      case 'overdue': return 'Vencida';
-      case 'cancelled': return 'Cancelada';
-      default: return status;
-    }
+    const statusConfig = invoiceStatuses.find(s => s.code === status);
+    return statusConfig?.name || status;
   };
 
   const totals = calculateTotals(items);
@@ -707,7 +731,10 @@ export function InvoicesModule() {
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
+                      <span
+                        className="px-3 py-1 rounded-full text-xs font-medium border"
+                        style={getStatusStyle(invoice.status)}
+                      >
                         {getStatusLabel(invoice.status)}
                       </span>
                     </td>
@@ -956,12 +983,11 @@ export function InvoicesModule() {
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   >
-                    <option value="draft">Borrador</option>
-                    <option value="validated">Validada</option>
-                    <option value="sent">Enviada</option>
-                    <option value="paid">Pagada</option>
-                    <option value="overdue">Vencida</option>
-                    <option value="cancelled">Cancelada</option>
+                    {invoiceStatuses.map(status => (
+                      <option key={status.code} value={status.code}>
+                        {status.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1183,7 +1209,10 @@ export function InvoicesModule() {
 
                 <div className="text-right">
                   <div className="mb-4">
-                    <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(selectedInvoice.status)}`}>
+                    <span
+                      className="px-4 py-2 rounded-full text-sm font-semibold border"
+                      style={getStatusStyle(selectedInvoice.status)}
+                    >
                       {getStatusLabel(selectedInvoice.status)}
                     </span>
                   </div>
