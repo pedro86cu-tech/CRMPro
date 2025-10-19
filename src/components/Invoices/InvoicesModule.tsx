@@ -25,7 +25,7 @@ interface Invoice {
   order_id?: string;
   issue_date: string;
   due_date: string;
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  status: 'draft' | 'validated' | 'sent' | 'paid' | 'overdue' | 'cancelled';
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
@@ -532,6 +532,7 @@ export function InvoicesModule() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-slate-100 text-slate-700';
+      case 'validated': return 'bg-cyan-100 text-cyan-700';
       case 'sent': return 'bg-blue-100 text-blue-700';
       case 'paid': return 'bg-emerald-100 text-emerald-700';
       case 'overdue': return 'bg-red-100 text-red-700';
@@ -543,6 +544,7 @@ export function InvoicesModule() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'draft': return 'Borrador';
+      case 'validated': return 'Validada';
       case 'sent': return 'Enviada';
       case 'paid': return 'Pagada';
       case 'overdue': return 'Vencida';
@@ -955,6 +957,7 @@ export function InvoicesModule() {
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   >
                     <option value="draft">Borrador</option>
+                    <option value="validated">Validada</option>
                     <option value="sent">Enviada</option>
                     <option value="paid">Pagada</option>
                     <option value="overdue">Vencida</option>
