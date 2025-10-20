@@ -304,6 +304,11 @@ Deno.serve(async (req: Request) => {
         const orderCurrency = orderData.items && orderData.items.length > 0 ? orderData.items[0].currency : 'UYU';
         console.log("Moneda de la orden:", orderCurrency);
 
+        const commissionAmount = orderData.commission_amount || 0;
+        const commissionRate = totalAmount > 0 && commissionAmount > 0
+          ? (commissionAmount / totalAmount) * 100
+          : 0;
+
         const { data: order, error: orderError } = await supabase
           .from("orders")
           .insert({
@@ -323,6 +328,8 @@ Deno.serve(async (req: Request) => {
             currency: orderCurrency,
             external_order_id: orderData.id,
             external_partner_id: orderData.partner_id,
+            commission_amount: commissionAmount,
+            commission_rate: Math.round(commissionRate * 100) / 100,
             notes: `Orden importada desde DogCatify (${orderData.items[0]?.partnerName || 'Partner'})\nTipo: ${orderData.order_type}\nM\u00e9todo de pago: ${orderData.payment_method}\nMonto partner: ${orderData.partner_amount}\nComisi\u00f3n: ${orderData.commission_amount}${shippingCost > 0 ? `\nEnv\u00edo: $${shippingCost} (IVA: $${shippingTaxAmount})` : ''}`,
             metadata: orderData,
             order_date: new Date(orderData.created_at).toISOString().split('T')[0]

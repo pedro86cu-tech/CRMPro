@@ -18,8 +18,10 @@ import {
   X,
   BarChart3,
   PieChart,
-  Receipt
+  Receipt,
+  Users
 } from 'lucide-react';
+import { CommissionBillingModule } from './CommissionBillingModule';
 
 interface Order {
   id: string;
@@ -72,7 +74,7 @@ interface MonthlyData {
 
 export function AccountingModule() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'overview' | 'payments' | 'reports' | 'receivables'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'payments' | 'reports' | 'receivables' | 'commissions'>('overview');
   const [payments, setPayments] = useState<Payment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [summary, setSummary] = useState<FinancialSummary>({
@@ -385,6 +387,19 @@ export function AccountingModule() {
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 Cuentas por Cobrar
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('commissions')}
+              className={`px-6 py-3 rounded-xl font-medium transition ${
+                activeTab === 'commissions'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Comisiones
               </div>
             </button>
           </div>
@@ -927,6 +942,10 @@ export function AccountingModule() {
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'commissions' && (
+        <CommissionBillingModule />
       )}
     </div>
   );
