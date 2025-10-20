@@ -672,26 +672,36 @@ export function ExternalValidationModule() {
                 </div>
 
                 <div className="col-span-2 border-t border-slate-200 pt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base font-semibold text-slate-900">Mapeo de Campos</h3>
-                    <button
-                      type="button"
-                      onClick={loadDGITemplate}
-                      className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-                    >
-                      Cargar Template DGI Uruguay
-                    </button>
-                  </div>
+                  <h3 className="text-base font-semibold text-slate-900 mb-4">Configuración de Respuesta</h3>
                 </div>
 
-                <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
-                  <FieldMapper
-                    title="Mapeo de Request (Envío a API)"
-                    mappings={formData.request_mapping || {}}
-                    onChange={(mappings) => setFormData({ ...formData, request_mapping: mappings })}
-                    availableFields={REQUEST_AVAILABLE_FIELDS}
-                    placeholder="Seleccione campo del sistema"
-                  />
+                <div className="col-span-2 bg-blue-50 rounded-lg p-6 border border-blue-200">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-2 flex items-center space-x-2">
+                    <FileText size={16} />
+                    <span>Formato e-Ticket (Hardcodeado)</span>
+                  </h3>
+                  <p className="text-xs text-blue-800 mb-3">
+                    El formato de envío está configurado automáticamente en el código para e-Tickets (ventas al público).
+                    No necesitas mapear campos manualmente.
+                  </p>
+                  <div className="bg-white rounded p-3 text-xs font-mono text-slate-700">
+                    <pre className="whitespace-pre-wrap">{`{
+  "numero_cfe": "[Número de factura]",
+  "serie": "A",
+  "rut_emisor": "[RUT emisor]",
+  "razon_social_emisor": "[Razón social]",
+  "fecha_emision": "[Fecha ISO]",
+  "moneda": "UYU",
+  "total": [Total],
+  "subtotal": [Subtotal],
+  "iva": [IVA],
+  "items": [...],
+  "datos_adicionales": {
+    "observaciones": "Venta al público",
+    "forma_pago": "Contado"
+  }
+}`}</pre>
+                  </div>
                 </div>
 
                 <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
