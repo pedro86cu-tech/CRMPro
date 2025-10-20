@@ -91,6 +91,62 @@ Deno.serve(async (req: Request) => {
 
     const config = configs[0];
 
+    // Obtener tax_rate de la orden si existe
+    const defaultTaxRate = invoice.orders?.tax_rate || 22;
+
+    // Construir items con IVA incluido
+    const items = (orderItems || []).map((item: any) => {
+      const cantidad = parseFloat(String(item.quantity || 1));
+      const precioUnitario = parseFloat(String(item.unit_price || 0));
+      const ivaPorcentaje = parseFloat(String(item.tax_rate || defaultTaxRate));
+      const subtotalItem = cantidad * precioUnitario;
+      const ivaItem = subtotalItem * (ivaPorcentaje / 100);
+      const totalItem = subtotalItem + ivaItem;
+
+      return {
+        descripcion: item.product_name || item.description || "",
+        cantidad: cantidad,
+        precio_unitario: precioUnitario,
+        iva_porcentaje: ivaPorcentaje,
+        subtotal: Math.round(subtotalItem * 100) / 100,
+        iva: Math.round(ivaItem * 100) / 100,
+        total: Math.round(totalItem * 100) / 100
+      };
+    });
+
+    // Si hay costo de envío, agregarlo como un item adicional
+    const shippingCost = parseFloat(String(invoice.orders?.shipping_cost || 0));
+    if (shippingCost > 0) {
+      const shippingTaxRate = 22; // IVA estándar para envíos en Uruguay
+      const shippingSubtotal = shippingCost;
+      const shippingIva = shippingSubtotal * (shippingTaxRate / 100);
+      const shippingTotal = shippingSubtotal + shippingIva;
+
+      items.push({
+        descripcion: "Costo de Envío",
+        cantidad: 1,
+        precio_unitario: Math.round(shippingSubtotal * 100) / 100,
+        iva_porcentaje: shippingTaxRate,
+        subtotal: Math.round(shippingSubtotal * 100) / 100,
+        iva: Math.round(shippingIva * 100) / 100,
+        total: Math.round(shippingTotal * 100) / 100
+      });
+    }
+
+    // Calcular totales basados en la suma de los items
+    const calculatedSubtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+    const calculatedIva = items.reduce((sum, item) => sum + item.iva, 0);
+    const calculatedTotal = items.reduce((sum, item) => sum + item.total, 0);
+
+    console.log("=== CÁLCULOS DE FACTURA ===");
+    console.log("Items:", items.length);
+    console.log("Subtotal calculado:", calculatedSubtotal);
+    console.log("IVA calculado:", calculatedIva);
+    console.log("Total calculado:", calculatedTotal);
+    console.log("Shipping cost:", shippingCost);
+    console.log("Invoice total_amount:", invoice.total_amount);
+    console.log("Items detalle:", JSON.stringify(items, null, 2));
+
     const requestPayload = {
       numero_cfe: invoice.invoice_number,
       serie: invoice.serie_cfe || "A",
@@ -98,25 +154,10 @@ Deno.serve(async (req: Request) => {
       razon_social_emisor: invoice.company_name || "Empresa Demo S.A.",
       fecha_emision: invoice.issue_date || new Date().toISOString(),
       moneda: invoice.currency || "UYU",
-      total: parseFloat(String(invoice.total_amount || 0)),
-      subtotal: parseFloat(String(invoice.subtotal || 0)),
-      iva: parseFloat(String(invoice.tax_amount || 0)),
-      items: (orderItems || []).map((item: any) => {
-        const cantidad = parseFloat(String(item.quantity || 1));
-        const precioUnitario = parseFloat(String(item.unit_price || 0));
-        const ivaPorcentaje = parseFloat(String(item.tax_rate || 22));
-        const subtotalItem = cantidad * precioUnitario;
-        const ivaItem = subtotalItem * (ivaPorcentaje / 100);
-        const totalItem = subtotalItem + ivaItem;
-
-        return {
-          descripcion: item.product_name || item.description || "",
-          cantidad: cantidad,
-          precio_unitario: precioUnitario,
-          iva_porcentaje: ivaPorcentaje,
-          total: Math.round(totalItem * 100) / 100
-        };
-      }),
+      subtotal: Math.round(calculatedSubtotal * 100) / 100,
+      iva: Math.round(calculatedIva * 100) / 100,
+      total: Math.round(calculatedTotal * 100) / 100,
+      items: items,
       datos_adicionales: {
         observaciones: invoice.notes || "Venta al público",
         forma_pago: invoice.orders?.payment_method || "Contado"
