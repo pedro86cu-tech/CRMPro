@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import {
-  Plus, FileText, DollarSign, TrendingUp, AlertTriangle, CheckCircle,
-  Clock, Search, Calendar, Building2, Download, Send, X, Trash2, Eye,
-  Edit, ShoppingCart, Percent, Hash, Package
-} from 'lucide-react';
+import { Plus, FileText, DollarSign, TrendingUp, AlertTriangle, CheckCircle, Clock, Search, Calendar, Building2, Download, Send, X, Trash2, Eye, CreditCard as Edit, ShoppingCart, Percent, Hash, Package } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface InvoiceItem {
