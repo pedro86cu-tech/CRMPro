@@ -256,7 +256,7 @@ Deno.serve(async (req: Request) => {
     if (validationResult === "approved") {
       const responseMapping = config.response_mapping as any;
       const updateData: any = {
-        status: "attached",
+        status: "validated",
         validated_at: new Date().toISOString(),
         validation_response: responsePayload,
         pending_validation: false
