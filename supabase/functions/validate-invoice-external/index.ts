@@ -101,13 +101,22 @@ Deno.serve(async (req: Request) => {
       total: parseFloat(String(invoice.total_amount || 0)),
       subtotal: parseFloat(String(invoice.subtotal || 0)),
       iva: parseFloat(String(invoice.tax_amount || 0)),
-      items: (orderItems || []).map((item: any) => ({
-        descripcion: item.product_name || item.description || "",
-        cantidad: parseFloat(String(item.quantity || 1)),
-        precio_unitario: parseFloat(String(item.unit_price || 0)),
-        iva_porcentaje: parseFloat(String(item.tax_rate || 22)),
-        total: parseFloat(String(item.total_price || 0))
-      })),
+      items: (orderItems || []).map((item: any) => {
+        const cantidad = parseFloat(String(item.quantity || 1));
+        const precioUnitario = parseFloat(String(item.unit_price || 0));
+        const ivaPorcentaje = parseFloat(String(item.tax_rate || 22));
+        const subtotalItem = cantidad * precioUnitario;
+        const ivaItem = subtotalItem * (ivaPorcentaje / 100);
+        const totalItem = subtotalItem + ivaItem;
+
+        return {
+          descripcion: item.product_name || item.description || "",
+          cantidad: cantidad,
+          precio_unitario: precioUnitario,
+          iva_porcentaje: ivaPorcentaje,
+          total: Math.round(totalItem * 100) / 100
+        };
+      }),
       datos_adicionales: {
         observaciones: invoice.notes || "Venta al público",
         forma_pago: invoice.orders?.payment_method || "Contado"
