@@ -324,6 +324,20 @@ Deno.serve(async (req: Request) => {
         .from("invoices")
         .update(updateData)
         .eq("id", invoice_id);
+    } else if (validationResult === "rejected" || validationResult === "error") {
+      console.log("Factura rechazada o con error, actualizando estado a 'refused'");
+
+      await supabase
+        .from("invoices")
+        .update({
+          status: "refused",
+          validation_response: responsePayload,
+          pending_validation: false,
+          dgi_estado: "rechazado",
+          dgi_mensaje: errorMessage || "Error en validación",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", invoice_id);
     }
 
     return new Response(
