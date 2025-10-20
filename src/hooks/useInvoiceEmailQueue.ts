@@ -5,6 +5,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 export function useInvoiceEmailQueue() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const processingRef = useRef(false);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     const processFunction = async () => {
@@ -41,9 +42,15 @@ export function useInvoiceEmailQueue() {
           if (response.ok) {
             const result = await response.json();
             console.log('✅ Emails procesados:', result);
+            if (result.failed > 0) {
+              console.warn('⚠️ Algunos emails fallaron, revisa las observaciones de las facturas');
+            }
           } else {
-            console.error('❌ Error procesando emails:', await response.text());
+            const errorText = await response.text();
+            console.error('❌ Error procesando emails:', errorText);
           }
+        } else {
+          console.log('✅ No hay facturas pendientes de envío');
         }
       } catch (error) {
         console.error('❌ Error en procesamiento automático de emails:', error);
@@ -54,6 +61,11 @@ export function useInvoiceEmailQueue() {
 
     // Procesar al inicio
     processFunction();
+
+    // Procesar cada 30 segundos (polling para asegurar que se procese)
+    intervalRef.current = window.setInterval(() => {
+      processFunction();
+    }, 30000);
 
     console.log('👂 Iniciando escucha de cola de emails...');
 
@@ -81,6 +93,9 @@ export function useInvoiceEmailQueue() {
       console.log('🛑 Cerrando suscripción de cola de emails...');
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
+      }
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
       }
     };
   }, []);
