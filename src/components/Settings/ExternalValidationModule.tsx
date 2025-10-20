@@ -186,12 +186,31 @@ export function ExternalValidationModule() {
         return;
       }
 
+      console.group('📤 REQUEST ENVIADO A DGI');
+      console.log('🔹 Factura ID:', testInvoiceId);
+      console.log('🔹 Config ID:', selectedConfig?.id);
+      if (data?.request_payload) {
+        console.log('🔹 JSON enviado:');
+        console.log(JSON.stringify(data.request_payload, null, 2));
+      }
+      console.groupEnd();
+
+      console.group('📥 RESPONSE RECIBIDA DE DGI');
+      console.log('🔹 Status Code:', data?.status_code);
+      console.log('🔹 Success:', data?.success);
+      console.log('🔹 Validation Result:', data?.validation_result);
+      if (data?.response_payload) {
+        console.log('🔹 JSON recibido:');
+        console.log(JSON.stringify(data.response_payload, null, 2));
+      }
+      console.groupEnd();
+
       if (data?.success) {
         const result = data.validation_result || 'pendiente';
         toast.success(`✅ Validación exitosa! Estado: ${result}`);
 
         if (data.external_reference) {
-          console.log('Referencia externa:', data.external_reference);
+          console.log('✅ Referencia externa:', data.external_reference);
         }
       } else {
         const errorMsg = data?.error || data?.message || 'Error desconocido';
@@ -718,9 +737,14 @@ export function ExternalValidationModule() {
                     </button>
                   </div>
                   {testInvoiceId && (
-                    <p className="text-xs text-slate-400 mt-2">
-                      ℹ️ La factura seleccionada será validada con la API de DGI configurada
-                    </p>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs text-slate-400">
+                        ℹ️ La factura seleccionada será validada con la API de DGI configurada
+                      </p>
+                      <p className="text-xs text-green-600 font-medium">
+                        🖥️ El JSON enviado y recibido se mostrará en la consola del navegador (F12)
+                      </p>
+                    </div>
                   )}
 
                   <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
