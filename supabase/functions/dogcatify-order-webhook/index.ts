@@ -43,6 +43,18 @@ interface ShippingInfo {
   shipping_iva_amount: number;
 }
 
+interface DogCatifyPartner {
+  id: string;
+  rut: string;
+  calle: string;
+  email: string;
+  phone: string;
+  barrio: string;
+  numero: string;
+  business_name: string;
+  codigo_postal: string;
+}
+
 interface DogCatifyOrder {
   id: string;
   partner_id: string;
@@ -60,6 +72,7 @@ interface DogCatifyOrder {
   created_at: string;
   updated_at: string;
   customer: DogCatifyCustomer;
+  partner?: DogCatifyPartner;
   items: DogCatifyItem[];
   pet_id?: string | null;
   booking_id?: string | null;
@@ -85,7 +98,7 @@ async function verifySignature(payload: any, signature: string): Promise<boolean
   const webhookSecret = Deno.env.get("DOGCATIFY_WEBHOOK_SECRET");
 
   if (!webhookSecret) {
-    console.error("DOGCATIFY_WEBHOOK_SECRET no est\u00e1 configurado");
+    console.error("DOGCATIFY_WEBHOOK_SECRET no está configurado");
     return false;
   }
 
@@ -102,8 +115,8 @@ async function verifySignature(payload: any, signature: string): Promise<boolean
       ["sign"]
     );
 
-    const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, data);
-    const expected = Array.from(new Uint8Array(signatureBuffer))
+    const signatureBytes = await crypto.subtle.sign("HMAC", cryptoKey, data);
+    const expected = Array.from(new Uint8Array(signatureBytes))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
 
@@ -126,7 +139,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         error: "Method not allowed",
-        message: "Este endpoint solo acepta peticiones POST con un JSON v\u00e1lido en el body"
+        message: "Este endpoint solo acepta peticiones POST con un JSON válido en el body"
       }),
       {
         status: 405,
@@ -137,7 +150,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     console.log("=== WEBHOOK DOGCATIFY RECIBIDO ===");
-    console.log("M\u00e9todo:", req.method);
+    console.log("Método:", req.method);
 
     const signature = req.headers.get("x-dogcatify-signature");
 
@@ -155,15 +168,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    let rawPayload;
-    try {
-      rawPayload = await req.json();
-    } catch (jsonError) {
-      console.error("Error parseando JSON:", jsonError);
+    const payload: WebhookPayload = await req.json();
+    console.log("Payload recibido:", JSON.stringify(payload, null, 2));
+
+    const { event, order_id, data: orderData } = payload;
+
+    if (!event || !order_id || !orderData) {
       return new Response(
         JSON.stringify({
-          error: "Invalid JSON",
-          message: "El body de la petici\u00f3n no es un JSON v\u00e1lido"
+          error: "Invalid payload",
+          message: "El payload debe contener event, order_id y data"
         }),
         {
           status: 400,
@@ -172,20 +186,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log("Payload recibido:", JSON.stringify(rawPayload, null, 2));
-
-    const payload: WebhookPayload = rawPayload;
-    const event = payload.event;
-    const orderData = payload.data;
-
     console.log("Evento:", event);
-    console.log("Order ID:", payload.order_id);
-    console.log("Order Data:", JSON.stringify(orderData, null, 2));
+    console.log("Order ID:", order_id);
 
-    if (signature && Deno.env.get("DOGCATIFY_WEBHOOK_SECRET")) {
+    if (signature) {
+      console.log("Verificando firma...");
       const isValid = await verifySignature(payload, signature);
       if (!isValid) {
-        console.error("Firma inv\u00e1lida");
+        console.error("Firma inválida");
         return new Response(
           JSON.stringify({ error: "Invalid signature" }),
           {
@@ -194,7 +202,7 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
-      console.log("\u2713 Firma verificada correctamente");
+      console.log("✓ Firma verificada correctamente");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -216,7 +224,7 @@ Deno.serve(async (req: Request) => {
 
         if (existingClient) {
           clientId = existingClient.id;
-          console.log("\u2713 Cliente existente encontrado:", clientId);
+          console.log("✓ Cliente existente encontrado:", clientId);
 
           const fullAddress = `${customerData.calle} ${customerData.numero}, ${customerData.barrio}`;
           const { error: updateError } = await supabase
@@ -233,7 +241,7 @@ Deno.serve(async (req: Request) => {
             .eq("id", clientId);
 
           if (!updateError) {
-            console.log("\u2713 Datos del cliente actualizados");
+            console.log("✓ Datos del cliente actualizados");
           }
         } else {
           const fullAddress = `${customerData.calle} ${customerData.numero}, ${customerData.barrio}`;
@@ -263,7 +271,80 @@ Deno.serve(async (req: Request) => {
           }
 
           clientId = newClient.id;
-          console.log("\u2713 Cliente creado:", clientId);
+          console.log("✓ Cliente creado:", clientId);
+        }
+
+        // Procesar y registrar Partner si viene en el webhook
+        let partnerId = null;
+        if (orderData.partner) {
+          const partnerData = orderData.partner;
+          console.log("Procesando partner:", partnerData.business_name);
+
+          const { data: existingPartner } = await supabase
+            .from("partners")
+            .select("id")
+            .eq("external_id", partnerData.id)
+            .maybeSingle();
+
+          if (existingPartner) {
+            partnerId = existingPartner.id;
+            console.log("✓ Partner existente encontrado:", partnerId);
+
+            // Actualizar datos del partner
+            const { error: updatePartnerError } = await supabase
+              .from("partners")
+              .update({
+                name: partnerData.business_name,
+                business_name: partnerData.business_name,
+                rut: partnerData.rut,
+                email: partnerData.email,
+                phone: partnerData.phone,
+                calle: partnerData.calle,
+                numero: partnerData.numero,
+                barrio: partnerData.barrio,
+                postal_code: partnerData.codigo_postal,
+                address: `${partnerData.calle} ${partnerData.numero}, ${partnerData.barrio}`,
+                city: partnerData.barrio,
+                country: "Uruguay",
+                updated_at: new Date().toISOString()
+              })
+              .eq("id", partnerId);
+
+            if (!updatePartnerError) {
+              console.log("✓ Datos del partner actualizados");
+            }
+          } else {
+            // Crear nuevo partner
+            const partnerInsertData = {
+              external_id: partnerData.id,
+              name: partnerData.business_name,
+              business_name: partnerData.business_name,
+              rut: partnerData.rut,
+              email: partnerData.email,
+              phone: partnerData.phone,
+              calle: partnerData.calle,
+              numero: partnerData.numero,
+              barrio: partnerData.barrio,
+              postal_code: partnerData.codigo_postal,
+              address: `${partnerData.calle} ${partnerData.numero}, ${partnerData.barrio}`,
+              city: partnerData.barrio,
+              country: "Uruguay",
+              is_active: true
+            };
+
+            const { data: newPartner, error: partnerError } = await supabase
+              .from("partners")
+              .insert(partnerInsertData)
+              .select("id")
+              .single();
+
+            if (partnerError) {
+              console.error("Error creando partner:", partnerError);
+            } else {
+              partnerId = newPartner.id;
+              console.log("✓ Partner creado:", partnerId);
+            }
+          }
         }
 
         const orderNumber = `DC-${Date.now()}-${orderData.id.substring(0, 8)}`;
@@ -278,10 +359,10 @@ Deno.serve(async (req: Request) => {
         if (orderData.shipping_info && orderData.shipping_info.shipping_cost) {
           shippingCost = orderData.shipping_info.shipping_cost || 0;
           shippingTaxAmount = orderData.shipping_info.shipping_iva_amount || 0;
-          console.log(`Costo de env\u00edo detectado: $${shippingCost}, IVA env\u00edo: $${shippingTaxAmount}`);
+          console.log(`Costo de envío detectado: $${shippingCost}, IVA envío: $${shippingTaxAmount}`);
         } else if (orderData.shipping_cost) {
           shippingCost = orderData.shipping_cost || 0;
-          console.log(`Costo de env\u00edo (campo directo): $${shippingCost}`);
+          console.log(`Costo de envío (campo directo): $${shippingCost}`);
         }
 
         if (subtotal === 0 || taxAmount === 0) {
@@ -298,7 +379,7 @@ Deno.serve(async (req: Request) => {
           totalAmount = subtotal + taxAmount + shippingCost + shippingTaxAmount;
         }
 
-        console.log(`C\u00e1lculos financieros: Subtotal=${subtotal}, IVA=${taxAmount} (${taxRate}%), Env\u00edo=${shippingCost}, IVA Env\u00edo=${shippingTaxAmount}, Total=${totalAmount}`);
+        console.log(`Cálculos financieros: Subtotal=${subtotal}, IVA=${taxAmount} (${taxRate}%), Envío=${shippingCost}, IVA Envío=${shippingTaxAmount}, Total=${totalAmount}`);
 
         const shippingAddress = orderData.shipping_info?.shipping_address || orderData.shipping_address || `${customerData.calle} ${customerData.numero}`;
         const orderCurrency = orderData.items && orderData.items.length > 0 ? orderData.items[0].currency : 'UYU';
@@ -314,6 +395,7 @@ Deno.serve(async (req: Request) => {
           .insert({
             order_number: orderNumber,
             client_id: clientId,
+            partner_id: partnerId,
             status: orderData.status || 'pending',
             payment_status: orderData.payment_status || 'unpaid',
             payment_method: orderData.payment_method || 'unknown',
@@ -330,7 +412,7 @@ Deno.serve(async (req: Request) => {
             external_partner_id: orderData.partner_id,
             commission_amount: commissionAmount,
             commission_rate: Math.round(commissionRate * 100) / 100,
-            notes: `Orden importada desde DogCatify (${orderData.items[0]?.partnerName || 'Partner'})\nTipo: ${orderData.order_type}\nM\u00e9todo de pago: ${orderData.payment_method}\nMonto partner: ${orderData.partner_amount}\nComisi\u00f3n: ${orderData.commission_amount}${shippingCost > 0 ? `\nEnv\u00edo: $${shippingCost} (IVA: $${shippingTaxAmount})` : ''}`,
+            notes: `Orden importada desde DogCatify (${orderData.items[0]?.partnerName || 'Partner'})\nTipo: ${orderData.order_type}\nMétodo de pago: ${orderData.payment_method}\nMonto partner: ${orderData.partner_amount}\nComisión: ${orderData.commission_amount}${shippingCost > 0 ? `\nEnvío: $${shippingCost} (IVA: $${shippingTaxAmount})` : ''}`,
             metadata: orderData,
             order_date: new Date(orderData.created_at).toISOString().split('T')[0]
           })
@@ -342,136 +424,53 @@ Deno.serve(async (req: Request) => {
           throw orderError;
         }
 
-        console.log("\u2713 Orden creada:", order.id);
+        console.log("✓ Orden creada:", orderNumber, "ID:", order.id);
 
-        if (orderData.items && orderData.items.length > 0) {
-          const orderItems = orderData.items.map((item) => {
-            const unitPrice = item.original_price || item.price;
-            const discountPercent = item.discount_percentage || 0;
-            const priceAfterDiscount = unitPrice * (1 - discountPercent / 100);
-            const lineTotal = item.quantity * priceAfterDiscount;
+        for (const item of orderData.items) {
+          const itemCurrencyCode = item.currency_code_dgi || (item.currency === 'UYU' ? '858' : item.currency === 'USD' ? '840' : '858');
+          const itemIvaRate = item.iva_rate || taxRate || 0;
+          const itemSubtotal = item.subtotal || (item.price * item.quantity);
+          const itemIvaAmount = item.iva_amount || (itemSubtotal * (itemIvaRate / 100));
 
-            const itemType = orderData.order_type === 'service' ? 'service' : 'product';
-            const partnerName = item.partnerName || (orderData.items[0]?.partnerName) || 'Partner';
-
-            return {
+          const { error: itemError } = await supabase
+            .from("order_items")
+            .insert({
               order_id: order.id,
               product_name: item.name,
-              description: `${item.name} - ${partnerName}`,
+              description: `Partner: ${item.partnerName}`,
               quantity: item.quantity,
-              unit_price: unitPrice,
-              line_total: lineTotal,
-              total_price: lineTotal,
-              discount_percent: discountPercent,
-              external_product_id: item.id,
-              item_type: itemType,
-              currency: item.currency || 'UYU',
-              notes: item.image ? `Imagen: ${item.image}` : ''
-            };
-          });
+              unit_price: item.price,
+              discount_percent: item.discount_percentage || 0,
+              line_total: itemSubtotal,
+              total_price: itemSubtotal + itemIvaAmount,
+              currency: itemCurrencyCode
+            });
 
-          const { error: itemsError } = await supabase
-            .from("order_items")
-            .insert(orderItems);
-
-          if (itemsError) {
-            console.error("Error creando items:", itemsError);
-          } else {
-            console.log(`\u2713 ${orderItems.length} items creados`);
+          if (itemError) {
+            console.error("Error insertando item:", itemError);
           }
         }
 
-        break;
-      }
+        console.log("✓ Items de orden insertados:", orderData.items.length);
 
-      case "order.update":
-      case "order.updated": {
-        console.log("Procesando actualizaci\u00f3n de orden...");
-
-        const { data: existingOrder } = await supabase
-          .from("orders")
-          .select("id")
-          .eq("external_order_id", orderData.id)
-          .maybeSingle();
-
-        if (existingOrder) {
-          const updateData: any = {
-            metadata: orderData,
-            updated_at: new Date().toISOString()
-          };
-
-          if (orderData.status) {
-            const orderStatusMap: Record<string, string> = {
-              'pending': 'pending',
-              'confirmed': 'confirmed',
-              'in_progress': 'in_progress',
-              'processing': 'processing',
-              'shipped': 'shipped',
-              'delivered': 'delivered',
-              'completed': 'completed',
-              'cancelled': 'cancelled',
-              'approved': 'confirmed',
-              'active': 'in_progress'
-            };
-
-            const mappedOrderStatus = orderStatusMap[orderData.status.toLowerCase()] || 'pending';
-            updateData.status = mappedOrderStatus;
-            console.log(`Order status mapeado: ${orderData.status} -> ${mappedOrderStatus}`);
-          }
-
-          if (orderData.payment_status) {
-            const paymentStatusMap: Record<string, string> = {
-              'confirmed': 'paid',
-              'paid': 'paid',
-              'unpaid': 'unpaid',
-              'pending': 'pending',
-              'processing': 'processing',
-              'partial': 'partial',
-              'refunded': 'refunded',
-              'cancelled': 'cancelled',
-              'approved': 'paid',
-              'completed': 'paid',
-              'failed': 'cancelled'
-            };
-
-            const mappedPaymentStatus = paymentStatusMap[orderData.payment_status.toLowerCase()] || orderData.payment_status;
-            updateData.payment_status = mappedPaymentStatus;
-            console.log(`Payment status mapeado: ${orderData.payment_status} -> ${mappedPaymentStatus}`);
-
-            if (mappedPaymentStatus === 'paid') {
-              updateData.status = 'confirmed';
-              console.log('\u2713 Pago confirmado - Status de orden actualizado a "confirmed"');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Orden procesada exitosamente",
+            order: {
+              id: order.id,
+              order_number: orderNumber
             }
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
-
-          if (orderData.total_amount !== undefined) {
-            updateData.total_amount = orderData.total_amount;
-          }
-          if (orderData.payment_method) {
-            updateData.payment_method = orderData.payment_method;
-          }
-
-          const { error: updateError } = await supabase
-            .from("orders")
-            .update(updateData)
-            .eq("id", existingOrder.id);
-
-          if (updateError) {
-            console.error("Error actualizando orden:", updateError);
-            throw updateError;
-          }
-
-          console.log("\u2713 Orden actualizada:", existingOrder.id);
-          console.log("Campos actualizados:", updateData);
-        } else {
-          console.warn("Orden no encontrada para actualizar:", orderData.id);
-        }
-
-        break;
+        );
       }
 
-      case "order.cancelled": {
-        console.log("Procesando cancelaci\u00f3n de orden...");
+      case "order.updated": {
+        console.log("Actualizando orden existente...");
 
         const { data: existingOrder } = await supabase
           .from("orders")
@@ -479,80 +478,70 @@ Deno.serve(async (req: Request) => {
           .eq("external_order_id", orderData.id)
           .maybeSingle();
 
-        if (existingOrder) {
-          const { error: cancelError } = await supabase
-            .from("orders")
-            .update({
-              status: "cancelled",
-              metadata: orderData,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", existingOrder.id);
-
-          if (cancelError) {
-            console.error("Error cancelando orden:", cancelError);
-            throw cancelError;
-          }
-
-          console.log("\u2713 Orden cancelada:", existingOrder.id);
+        if (!existingOrder) {
+          return new Response(
+            JSON.stringify({
+              error: "Order not found",
+              message: `No se encontró una orden con external_order_id: ${orderData.id}`
+            }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
         }
 
-        break;
-      }
-
-      case "order.completed": {
-        console.log("Procesando completaci\u00f3n de orden...");
-
-        const { data: existingOrder } = await supabase
+        const { error: updateError } = await supabase
           .from("orders")
-          .select("id")
-          .eq("external_order_id", orderData.id)
-          .maybeSingle();
+          .update({
+            status: orderData.status,
+            payment_status: orderData.payment_status,
+            payment_method: orderData.payment_method,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", existingOrder.id);
 
-        if (existingOrder) {
-          const { error: completeError } = await supabase
-            .from("orders")
-            .update({
-              status: "completed",
-              payment_status: "paid",
-              metadata: orderData,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", existingOrder.id);
-
-          if (completeError) {
-            console.error("Error completando orden:", completeError);
-            throw completeError;
-          }
-
-          console.log("\u2713 Orden completada:", existingOrder.id);
+        if (updateError) {
+          console.error("Error actualizando orden:", updateError);
+          throw updateError;
         }
 
-        break;
+        console.log("✓ Orden actualizada:", existingOrder.id);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Orden actualizada exitosamente",
+            order: {
+              id: existingOrder.id
+            }
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
       default:
-        console.warn("Evento no manejado:", event);
+        console.log("Evento no manejado:", event);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `Evento ${event} recibido pero no procesado`
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
     }
-
-    return new Response(
-      JSON.stringify({
-        received: true,
-        success: true,
-        order_id: payload.order_id
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error procesando webhook:", error);
     return new Response(
       JSON.stringify({
         error: "Internal server error",
-        message: error.message
+        message: error instanceof Error ? error.message : "Error desconocido"
       }),
       {
         status: 500,
