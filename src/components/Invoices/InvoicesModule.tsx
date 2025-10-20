@@ -38,6 +38,7 @@ interface Invoice {
   dgi_codigo_autorizacion?: string;
   dgi_mensaje?: string;
   validated_at?: string;
+  observations?: string;
   clients?: {
     contact_name: string;
     company_name?: string;
@@ -1286,6 +1287,19 @@ export function InvoicesModule() {
                     rows={3}
                     placeholder="Términos de pago y condiciones..."
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Observaciones</label>
+                  <textarea
+                    value={formData.observations || ''}
+                    onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50"
+                    rows={2}
+                    placeholder="Errores de validación o envío..."
+                    readOnly
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Este campo se actualiza automáticamente cuando hay errores</p>
                 </div>
               </div>
 

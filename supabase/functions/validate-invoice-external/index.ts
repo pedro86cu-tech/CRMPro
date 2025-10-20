@@ -333,7 +333,8 @@ Deno.serve(async (req: Request) => {
           validation_response: responsePayload,
           pending_validation: false,
           dgi_estado: "rechazado",
-          dgi_mensaje: errorMessage || "Error en validación"
+          dgi_mensaje: errorMessage || "Error en validación",
+          observations: `Error DGI: ${errorMessage || "Error en validación"}`
         })
         .eq("id", invoice_id);
     }
