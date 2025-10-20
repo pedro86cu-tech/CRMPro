@@ -16,50 +16,6 @@ function getNestedValue(obj: any, path: string): any {
   return path.split('.').reduce((current, prop) => current?.[prop], obj);
 }
 
-function setNestedValue(obj: any, path: string, value: any): void {
-  const keys = path.split('.');
-  const lastKey = keys.pop()!;
-  const target = keys.reduce((current, key) => {
-    if (!current[key]) current[key] = {};
-    return current[key];
-  }, obj);
-  target[lastKey] = value;
-}
-
-function processMapping(mapping: any, context: any): any {
-  const result: any = {};
-
-  for (const [targetKey, sourceConfig] of Object.entries(mapping)) {
-    if (typeof sourceConfig === 'string') {
-      const value = getNestedValue(context, sourceConfig);
-      setNestedValue(result, targetKey, value);
-    } else if (typeof sourceConfig === 'object' && sourceConfig !== null) {
-      if (sourceConfig._type === 'array' && sourceConfig._source && sourceConfig._mapping) {
-        const sourceArray = getNestedValue(context, sourceConfig._source);
-        if (Array.isArray(sourceArray)) {
-          const mappedArray = sourceArray.map((item: any) => {
-            const mappedItem: any = {};
-            for (const [itemKey, itemPath] of Object.entries(sourceConfig._mapping)) {
-              const itemValue = getNestedValue({ item }, `item.${itemPath}`);
-              mappedItem[itemKey] = itemValue;
-            }
-            return mappedItem;
-          });
-          setNestedValue(result, targetKey, mappedArray);
-        }
-      } else if (sourceConfig._type === 'object' && sourceConfig._mapping) {
-        const mappedObject = processMapping(sourceConfig._mapping, context);
-        setNestedValue(result, targetKey, mappedObject);
-      } else {
-        const value = getNestedValue(context, sourceConfig as string);
-        setNestedValue(result, targetKey, value);
-      }
-    }
-  }
-
-  return result;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -135,17 +91,33 @@ Deno.serve(async (req: Request) => {
 
     const config = configs[0];
 
-    const context = {
-      invoice,
-      client: invoice.clients,
-      order: invoice.orders,
-      items: orderItems || []
+    const requestPayload = {
+      numero_cfe: invoice.invoice_number,
+      serie: invoice.serie_cfe || "A",
+      tipo_cfe: invoice.tipo_cfe || "eFactura",
+      rut_emisor: invoice.rut_emisor || "211234560018",
+      razon_social_emisor: invoice.company_name || "Empresa Demo S.A.",
+      rut_receptor: invoice.clients?.document_number || "",
+      razon_social_receptor: invoice.clients?.company_name || invoice.clients?.contact_name || "",
+      fecha_emision: invoice.issue_date || new Date().toISOString(),
+      moneda: invoice.currency || "UYU",
+      total: parseFloat(String(invoice.total_amount || 0)),
+      subtotal: parseFloat(String(invoice.subtotal || 0)),
+      iva: parseFloat(String(invoice.tax_amount || 0)),
+      items: (orderItems || []).map((item: any) => ({
+        descripcion: item.product_name || item.description || "",
+        cantidad: parseFloat(String(item.quantity || 1)),
+        precio_unitario: parseFloat(String(item.unit_price || 0)),
+        iva_porcentaje: parseFloat(String(item.tax_rate || 22)),
+        total: parseFloat(String(item.total_price || 0))
+      })),
+      datos_adicionales: {
+        observaciones: invoice.notes || "",
+        forma_pago: invoice.orders?.payment_method || "Contado"
+      }
     };
 
-    const requestMapping = config.request_mapping as any;
-    const requestPayload = processMapping(requestMapping, context);
-
-    console.log("Request payload:", JSON.stringify(requestPayload, null, 2));
+    console.log("Request payload (hardcoded format):", JSON.stringify(requestPayload, null, 2));
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -153,13 +125,7 @@ Deno.serve(async (req: Request) => {
 
     if (config.headers) {
       for (const [key, value] of Object.entries(config.headers)) {
-        if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
-          const variablePath = value.slice(2, -2).trim();
-          const resolvedValue = getNestedValue(context, variablePath);
-          headers[key] = String(resolvedValue || '');
-        } else {
-          headers[key] = String(value);
-        }
+        headers[key] = String(value);
       }
     }
 
