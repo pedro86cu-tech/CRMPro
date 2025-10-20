@@ -33,6 +33,15 @@ interface Invoice {
   notes?: string;
   terms?: string;
   created_at: string;
+  numero_cfe?: string;
+  serie_cfe?: string;
+  tipo_cfe?: string;
+  cae?: string;
+  vencimiento_cae?: string;
+  dgi_estado?: string;
+  dgi_codigo_autorizacion?: string;
+  dgi_mensaje?: string;
+  validated_at?: string;
   clients?: {
     contact_name: string;
     company_name?: string;
@@ -150,6 +159,16 @@ export function InvoicesModule() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    processEmailQueue();
+
+    const interval = setInterval(() => {
+      processEmailQueue();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const generateInvoiceNumber = async () => {
     const { data } = await supabase
       .from('invoices')
@@ -181,6 +200,62 @@ export function InvoicesModule() {
     if (!error && data) {
       setInvoices(data);
       calculateStats(data);
+    }
+  };
+
+  const processEmailQueue = async () => {
+    const { data: queueItems, error: queueError } = await supabase
+      .from('invoice_email_queue')
+      .select('id, invoice_id')
+      .eq('status', 'pending')
+      .order('priority', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(5);
+
+    if (queueError || !queueItems || queueItems.length === 0) {
+      return;
+    }
+
+    for (const item of queueItems) {
+      await supabase
+        .from('invoice_email_queue')
+        .update({ status: 'processing' })
+        .eq('id', item.id);
+
+      try {
+        const response = await supabase.functions.invoke('send-invoice-email', {
+          body: { invoice_id: item.invoice_id }
+        });
+
+        if (response.error) {
+          await supabase
+            .from('invoice_email_queue')
+            .update({
+              status: 'failed',
+              last_error: response.error.message,
+              attempts: supabase.rpc('increment', { row_id: item.id })
+            })
+            .eq('id', item.id);
+        } else {
+          await supabase
+            .from('invoice_email_queue')
+            .update({
+              status: 'sent',
+              processed_at: new Date().toISOString()
+            })
+            .eq('id', item.id);
+
+          toast.success('Factura enviada por email automáticamente');
+        }
+      } catch (error: any) {
+        await supabase
+          .from('invoice_email_queue')
+          .update({
+            status: 'failed',
+            last_error: error.message
+          })
+          .eq('id', item.id);
+      }
     }
   };
 
@@ -696,11 +771,10 @@ export function InvoicesModule() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700">Número</th>
+                <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700">Número / CFE</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700">Cliente</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700">Monto</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700">Emisión</th>
-                <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700">Vencimiento</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700">Estado</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-slate-700">Acciones</th>
               </tr>
@@ -708,7 +782,7 @@ export function InvoicesModule() {
             <tbody>
               {paginatedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center">
+                  <td colSpan={6} className="py-12 text-center">
                     <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                     <p className="text-slate-500 text-lg">No hay facturas registradas</p>
                     <p className="text-slate-400 text-sm mt-2">Crea tu primera factura para comenzar</p>
@@ -719,10 +793,22 @@ export function InvoicesModule() {
                   <tr key={invoice.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
                     <td className="py-4 px-4">
                       <div className="flex items-center space-x-2">
-                        <div className="bg-emerald-100 p-2 rounded-lg">
-                          <FileText className="w-4 h-4 text-emerald-600" />
+                        <div className={`${invoice.numero_cfe ? 'bg-blue-100' : 'bg-emerald-100'} p-2 rounded-lg`}>
+                          <FileText className={`w-4 h-4 ${invoice.numero_cfe ? 'text-blue-600' : 'text-emerald-600'}`} />
                         </div>
-                        <span className="font-semibold text-slate-900">{invoice.invoice_number}</span>
+                        <div>
+                          {invoice.numero_cfe ? (
+                            <>
+                              <p className="font-bold text-blue-600 text-sm">CFE: {invoice.numero_cfe}</p>
+                              {invoice.serie_cfe && (
+                                <p className="text-xs text-slate-500">Serie: {invoice.serie_cfe}</p>
+                              )}
+                              <p className="text-xs text-slate-400">{invoice.invoice_number}</p>
+                            </>
+                          ) : (
+                            <span className="font-semibold text-slate-900">{invoice.invoice_number}</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="py-4 px-4">
@@ -747,25 +833,35 @@ export function InvoicesModule() {
                       </span>
                     </td>
                     <td className="py-4 px-4">
-                      <span className="text-sm text-slate-600">
-                        {new Date(invoice.issue_date).toLocaleDateString()}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-slate-400" />
+                      <div>
                         <span className="text-sm text-slate-600">
-                          {new Date(invoice.due_date).toLocaleDateString()}
+                          {new Date(invoice.issue_date).toLocaleDateString()}
                         </span>
+                        {invoice.tipo_cfe && (
+                          <p className="text-xs text-blue-600 font-medium mt-1">{invoice.tipo_cfe}</p>
+                        )}
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <span
-                        className="px-3 py-1 rounded-full text-xs font-medium border"
-                        style={getStatusStyle(invoice.status)}
-                      >
-                        {getStatusLabel(invoice.status)}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className="px-3 py-1 rounded-full text-xs font-medium border w-fit"
+                          style={getStatusStyle(invoice.status)}
+                        >
+                          {getStatusLabel(invoice.status)}
+                        </span>
+                        {invoice.dgi_estado && (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
+                            invoice.dgi_estado === 'aprobado'
+                              ? 'bg-green-100 text-green-700 border border-green-200'
+                              : invoice.dgi_estado === 'rechazado'
+                              ? 'bg-red-100 text-red-700 border border-red-200'
+                              : 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                          }`}>
+                            DGI: {invoice.dgi_estado}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex space-x-2">
