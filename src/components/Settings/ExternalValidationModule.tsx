@@ -195,8 +195,31 @@ export function ExternalValidationModule() {
         }
       } else {
         const errorMsg = data?.error || data?.message || 'Error desconocido';
-        toast.error(`❌ Error en validación: ${errorMsg}`);
-        console.error('Detalles del error:', data);
+        const statusCode = data?.status_code;
+
+        if (statusCode === 500) {
+          toast.error(`❌ Error del servidor DGI (HTTP 500). La API externa tiene problemas. Revisa los logs para más detalles.`);
+        } else if (statusCode === 401 || statusCode === 403) {
+          toast.error(`❌ Error de autenticación (HTTP ${statusCode}). Verifica las credenciales en la configuración.`);
+        } else if (statusCode === 400) {
+          toast.error(`❌ Request inválido (HTTP 400). Verifica el mapeo de campos en la configuración.`);
+        } else if (statusCode === 404) {
+          toast.error(`❌ Endpoint no encontrado (HTTP 404). Verifica la URL de la API.`);
+        } else {
+          toast.error(`❌ Error: ${errorMsg} ${statusCode ? `(HTTP ${statusCode})` : ''}`);
+        }
+
+        console.group('🔍 Detalles del Error de Validación');
+        console.error('Error completo:', data);
+        console.log('Status code:', statusCode);
+        console.log('Mensaje:', errorMsg);
+        if (data?.request_payload) {
+          console.log('Request enviado:', data.request_payload);
+        }
+        if (data?.response_payload) {
+          console.log('Response recibida:', data.response_payload);
+        }
+        console.groupEnd();
       }
 
       fetchLogs();
@@ -699,6 +722,20 @@ export function ExternalValidationModule() {
                       ℹ️ La factura seleccionada será validada con la API de DGI configurada
                     </p>
                   )}
+
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-2">💡 Solución de Problemas</h4>
+                    <ul className="text-xs text-blue-800 space-y-1">
+                      <li><strong>HTTP 500:</strong> La API de DGI tiene problemas internos. Verifica la URL y contacta soporte de DGI.</li>
+                      <li><strong>HTTP 401/403:</strong> Error de autenticación. Verifica usuario, contraseña o token en la configuración.</li>
+                      <li><strong>HTTP 400:</strong> Request inválido. Verifica el mapeo de campos y que los datos enviados sean correctos.</li>
+                      <li><strong>HTTP 404:</strong> URL incorrecta. Verifica que la URL de la API sea la correcta.</li>
+                      <li><strong>Timeout:</strong> La API no responde a tiempo. Aumenta el timeout en configuración.</li>
+                    </ul>
+                    <p className="text-xs text-blue-700 mt-3 pt-2 border-t border-blue-200">
+                      📋 <strong>Tip:</strong> Abre la pestaña "Logs" para ver el request enviado y la response recibida de DGI.
+                    </p>
+                  </div>
                 </div>
               )}
 
