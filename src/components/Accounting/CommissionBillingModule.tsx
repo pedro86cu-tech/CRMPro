@@ -99,34 +99,24 @@ export function CommissionBillingModule() {
 
   const fetchPendingInvoices = async () => {
     const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        orders!inner(
-          external_partner_id,
-          commission_amount,
-          metadata
-        )
-      `)
-      .eq('commission_billed', false)
-      .eq('status', 'sent')
-      .not('orders.external_partner_id', 'is', null)
-      .not('orders.commission_amount', 'is', null)
-      .gt('orders.commission_amount', 0);
+      .from('invoices_pending_commission')
+      .select('*');
 
     if (!error && data) {
       const invoices: PendingInvoice[] = data.map((inv: any) => ({
-        id: inv.id,
+        id: inv.invoice_id,
         invoice_number: inv.invoice_number,
-        total_amount: inv.total_amount,
+        total_amount: parseFloat(inv.invoice_total) || 0,
         issue_date: inv.issue_date,
         status: inv.status,
-        partner_id: inv.orders.external_partner_id,
-        partner_name: inv.orders.metadata?.items?.[0]?.partnerName || 'Partner',
-        commission_amount: inv.orders.commission_amount || 0,
-        order_id: inv.order_id
+        partner_id: inv.partner_id,
+        partner_name: inv.partner_name || 'Partner',
+        commission_amount: parseFloat(inv.commission_amount) || 0,
+        order_id: inv.invoice_id
       }));
       setPendingInvoices(invoices);
+    } else if (error) {
+      console.error('Error fetching pending invoices:', error);
     }
   };
 
@@ -135,7 +125,7 @@ export function CommissionBillingModule() {
 
     pendingInvoices.forEach(invoice => {
       const partnerId = invoice.partner_id;
-      const existingPartner = partners.find(p => p.external_id === partnerId);
+      const existingPartner = partners.find(p => p.id === partnerId);
 
       if (!groups.has(partnerId)) {
         groups.set(partnerId, {
