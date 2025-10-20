@@ -94,11 +94,8 @@ Deno.serve(async (req: Request) => {
     const requestPayload = {
       numero_cfe: invoice.invoice_number,
       serie: invoice.serie_cfe || "A",
-      tipo_cfe: invoice.tipo_cfe || "eFactura",
       rut_emisor: invoice.rut_emisor || "211234560018",
       razon_social_emisor: invoice.company_name || "Empresa Demo S.A.",
-      rut_receptor: invoice.clients?.document_number || "",
-      razon_social_receptor: invoice.clients?.company_name || invoice.clients?.contact_name || "",
       fecha_emision: invoice.issue_date || new Date().toISOString(),
       moneda: invoice.currency || "UYU",
       total: parseFloat(String(invoice.total_amount || 0)),
@@ -112,12 +109,12 @@ Deno.serve(async (req: Request) => {
         total: parseFloat(String(item.total_price || 0))
       })),
       datos_adicionales: {
-        observaciones: invoice.notes || "",
+        observaciones: invoice.notes || "Venta al público",
         forma_pago: invoice.orders?.payment_method || "Contado"
       }
     };
 
-    console.log("Request payload (hardcoded format):", JSON.stringify(requestPayload, null, 2));
+    console.log("Request payload (e-Ticket format):", JSON.stringify(requestPayload, null, 2));
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
