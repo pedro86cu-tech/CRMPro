@@ -26,6 +26,40 @@ function setNestedValue(obj: any, path: string, value: any): void {
   target[lastKey] = value;
 }
 
+function processMapping(mapping: any, context: any): any {
+  const result: any = {};
+
+  for (const [targetKey, sourceConfig] of Object.entries(mapping)) {
+    if (typeof sourceConfig === 'string') {
+      const value = getNestedValue(context, sourceConfig);
+      setNestedValue(result, targetKey, value);
+    } else if (typeof sourceConfig === 'object' && sourceConfig !== null) {
+      if (sourceConfig._type === 'array' && sourceConfig._source && sourceConfig._mapping) {
+        const sourceArray = getNestedValue(context, sourceConfig._source);
+        if (Array.isArray(sourceArray)) {
+          const mappedArray = sourceArray.map((item: any) => {
+            const mappedItem: any = {};
+            for (const [itemKey, itemPath] of Object.entries(sourceConfig._mapping)) {
+              const itemValue = getNestedValue({ item }, `item.${itemPath}`);
+              mappedItem[itemKey] = itemValue;
+            }
+            return mappedItem;
+          });
+          setNestedValue(result, targetKey, mappedArray);
+        }
+      } else if (sourceConfig._type === 'object' && sourceConfig._mapping) {
+        const mappedObject = processMapping(sourceConfig._mapping, context);
+        setNestedValue(result, targetKey, mappedObject);
+      } else {
+        const value = getNestedValue(context, sourceConfig as string);
+        setNestedValue(result, targetKey, value);
+      }
+    }
+  }
+
+  return result;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -73,6 +107,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: orderItems } = await supabase
+      .from("order_items")
+      .select("*")
+      .eq("order_id", invoice.order_id);
+
     let configQuery = supabase
       .from("external_invoice_api_config")
       .select("*")
@@ -86,7 +125,7 @@ Deno.serve(async (req: Request) => {
 
     if (configError || !configs || configs.length === 0) {
       return new Response(
-        JSON.stringify({ error: "No hay configuraci\u00f3n activa disponible" }),
+        JSON.stringify({ error: "No hay configuración activa disponible" }),
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -96,20 +135,33 @@ Deno.serve(async (req: Request) => {
 
     const config = configs[0];
 
-    const requestPayload: any = {};
-    const requestMapping = config.request_mapping as any;
+    const context = {
+      invoice,
+      client: invoice.clients,
+      order: invoice.orders,
+      items: orderItems || []
+    };
 
-    for (const [targetKey, sourcePath] of Object.entries(requestMapping)) {
-      const value = getNestedValue({ invoice }, sourcePath as string);
-      setNestedValue(requestPayload, targetKey, value);
-    }
+    const requestMapping = config.request_mapping as any;
+    const requestPayload = processMapping(requestMapping, context);
 
     console.log("Request payload:", JSON.stringify(requestPayload, null, 2));
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      ...(config.headers || {}),
     };
+
+    if (config.headers) {
+      for (const [key, value] of Object.entries(config.headers)) {
+        if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
+          const variablePath = value.slice(2, -2).trim();
+          const resolvedValue = getNestedValue(context, variablePath);
+          headers[key] = String(resolvedValue || '');
+        } else {
+          headers[key] = String(value);
+        }
+      }
+    }
 
     const authCreds = config.auth_credentials as any;
 
@@ -308,10 +360,13 @@ Deno.serve(async (req: Request) => {
         validation_result: validationResult,
         external_reference: externalReference,
         status: status,
-        message: errorMessage || "Validaci\u00f3n completada",
+        status_code: statusCode,
+        message: errorMessage || "Validación completada",
         duration_ms: duration,
         retry_count: retryCount,
         log_id: logEntry?.id,
+        request_payload: requestPayload,
+        response_payload: responsePayload,
       }),
       {
         status: 200,
