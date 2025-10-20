@@ -256,11 +256,10 @@ Deno.serve(async (req: Request) => {
     if (validationResult === "approved") {
       const responseMapping = config.response_mapping as any;
       const updateData: any = {
-        status: "validated",
+        status: "attached",
         validated_at: new Date().toISOString(),
         validation_response: responsePayload,
-        pending_validation: false,
-        updated_at: new Date().toISOString()
+        pending_validation: false
       };
 
       if (responseMapping.numero_cfe) {
@@ -334,8 +333,7 @@ Deno.serve(async (req: Request) => {
           validation_response: responsePayload,
           pending_validation: false,
           dgi_estado: "rechazado",
-          dgi_mensaje: errorMessage || "Error en validación",
-          updated_at: new Date().toISOString()
+          dgi_mensaje: errorMessage || "Error en validación"
         })
         .eq("id", invoice_id);
     }

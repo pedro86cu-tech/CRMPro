@@ -124,6 +124,26 @@ export function InvoicesModule() {
     loadClients();
     loadOrders();
     generateInvoiceNumber();
+
+    const channel = supabase
+      .channel('invoices-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'invoices'
+        },
+        (payload) => {
+          console.log('Invoice realtime update:', payload);
+          loadInvoices();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadInvoiceStatuses = async () => {
