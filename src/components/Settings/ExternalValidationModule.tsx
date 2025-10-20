@@ -53,6 +53,7 @@ export function ExternalValidationModule() {
   const [testInvoiceId, setTestInvoiceId] = useState('');
   const [testing, setTesting] = useState(false);
   const [useVisualMapper, setUseVisualMapper] = useState(true);
+  const [invoices, setInvoices] = useState<any[]>([]);
 
   const { user } = useAuth();
   const toast = useToast();
@@ -73,6 +74,7 @@ export function ExternalValidationModule() {
   useEffect(() => {
     fetchConfigs();
     fetchLogs();
+    fetchInvoices();
   }, []);
 
   const fetchConfigs = async () => {
@@ -95,6 +97,18 @@ export function ExternalValidationModule() {
 
     if (!error && data) {
       setLogs(data);
+    }
+  };
+
+  const fetchInvoices = async () => {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, numero_cfe, clients(contact_name, company_name)')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (!error && data) {
+      setInvoices(data);
     }
   };
 
@@ -152,7 +166,7 @@ export function ExternalValidationModule() {
 
   const handleTest = async () => {
     if (!testInvoiceId) {
-      toast.error('Por favor ingrese un ID de factura para probar');
+      toast.error('Por favor selecciona una factura para probar');
       return;
     }
 
@@ -166,17 +180,30 @@ export function ExternalValidationModule() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error en edge function:', error);
+        toast.error(`Error al llamar a la función: ${error.message}`);
+        return;
+      }
 
-      if (data.success) {
-        toast.success(`Validación exitosa: ${data.validation_result}`);
+      if (data?.success) {
+        const result = data.validation_result || 'pendiente';
+        toast.success(`✅ Validación exitosa! Estado: ${result}`);
+
+        if (data.external_reference) {
+          console.log('Referencia externa:', data.external_reference);
+        }
       } else {
-        toast.error(`Error en validación: ${data.message}`);
+        const errorMsg = data?.error || data?.message || 'Error desconocido';
+        toast.error(`❌ Error en validación: ${errorMsg}`);
+        console.error('Detalles del error:', data);
       }
 
       fetchLogs();
+      fetchInvoices();
     } catch (error: any) {
-      toast.error('Error al probar validación: ' + error.message);
+      console.error('Error completo:', error);
+      toast.error(`Error inesperado: ${error.message || 'Verifica la consola para más detalles'}`);
     } finally {
       setTesting(false);
     }
@@ -640,24 +667,38 @@ export function ExternalValidationModule() {
               {selectedConfig && (
                 <div className="border-t border-slate-200 pt-6">
                   <h3 className="text-sm font-medium text-slate-700 mb-3">Probar Configuración</h3>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Selecciona una factura existente para probar la validación con DGI
+                  </p>
                   <div className="flex space-x-2">
-                    <input
-                      type="text"
+                    <select
                       value={testInvoiceId}
                       onChange={(e) => setTestInvoiceId(e.target.value)}
-                      placeholder="ID de factura para probar"
-                      className="flex-1 border border-slate-300 rounded-lg px-4 py-2"
-                    />
+                      className="flex-1 border border-slate-300 rounded-lg px-4 py-2 bg-white"
+                    >
+                      <option value="">Seleccionar factura...</option>
+                      {invoices.map((invoice) => (
+                        <option key={invoice.id} value={invoice.id}>
+                          {invoice.invoice_number} - {invoice.clients?.company_name || invoice.clients?.contact_name}
+                          {invoice.numero_cfe && ` (CFE: ${invoice.numero_cfe})`}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={handleTest}
-                      disabled={testing}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center space-x-2"
+                      disabled={testing || !testInvoiceId}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                     >
                       <TestTube size={18} />
                       <span>{testing ? 'Probando...' : 'Probar'}</span>
                     </button>
                   </div>
+                  {testInvoiceId && (
+                    <p className="text-xs text-slate-400 mt-2">
+                      ℹ️ La factura seleccionada será validada con la API de DGI configurada
+                    </p>
+                  )}
                 </div>
               )}
 
