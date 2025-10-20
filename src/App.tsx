@@ -23,6 +23,7 @@ import { AccountingModule } from './components/Accounting/AccountingModule';
 import ParametersModule from './components/Settings/ParametersModule';
 import { ExternalValidationModule } from './components/Settings/ExternalValidationModule';
 import { useTwilioDevice } from './hooks/useTwilioDevice';
+import { useInvoiceAutoValidation } from './hooks/useInvoiceAutoValidation';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -50,6 +51,8 @@ function MainApp() {
   const [incomingCallModalOpen, setIncomingCallModalOpen] = useState(false);
   const [currentIncomingCall, setCurrentIncomingCall] = useState<any>(null);
   const { isReady, device, activeCall, makeCall } = useTwilioDevice();
+
+  useInvoiceAutoValidation();
 
 
   const handleAcceptIncomingCall = (call: any) => {
