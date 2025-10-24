@@ -347,8 +347,8 @@ export function InvoicesModule() {
   const loadOrders = async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, total_amount, client_id, clients(company_name)')
-      .in('status', ['pending', 'processing', 'completed', 'confirmed'])
+      .select('id, order_number, total_amount, client_id, status, clients(company_name)')
+      .in('status', ['pending', 'processing', 'completed', 'confirmed', 'shipped'])
       .order('order_date', { ascending: false });
     if (data) setOrders(data);
   };
