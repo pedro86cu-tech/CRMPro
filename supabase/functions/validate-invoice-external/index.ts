@@ -72,23 +72,25 @@ Deno.serve(async (req: Request) => {
       .from("external_invoice_api_config")
       .select("*")
       .eq("is_active", true)
-      .eq("config_type", "validation");
+      .eq("config_type", "validation")
+      .order("priority", { ascending: false });
 
     if (config_id) {
       configQuery = configQuery.eq("id", config_id);
     }
 
-    console.log("🔍 Buscando configuración de validación DGI...");
+    console.log("🔍 Buscando configuraciones de validación DGI (ordenadas por prioridad)...");
 
     const { data: configs, error: configError } = await configQuery;
 
-    console.log("📋 Resultados de configuración:", {
+    console.log("📋 Configuraciones encontradas:", {
       error: configError,
       configsFound: configs?.length || 0,
       configs: configs?.map(c => ({
         id: c.id,
         name: c.name,
-        config_type: c.config_type
+        config_type: c.config_type,
+        priority: c.priority
       }))
     });
 
@@ -104,10 +106,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const config = configs[0];
-    console.log("✅ Configuración seleccionada:", {
+    console.log("✅ Configuración seleccionada (mayor prioridad):", {
       id: config.id,
       name: config.name,
       config_type: config.config_type,
+      priority: config.priority,
       api_url: config.api_url
     });
 
