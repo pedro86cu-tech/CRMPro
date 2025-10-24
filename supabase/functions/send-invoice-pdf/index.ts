@@ -139,7 +139,7 @@ Deno.serve(async (req: Request) => {
     const recipientEmail = invoice.clients?.email || invoice.partners?.email || "";
 
     const requestPayload = {
-      template_name: "invoice_email_service",
+      pdf_template_name: "invoice_email_service",
       recipient_email: recipientEmail,
       order_id: invoice.orders?.dogcatify_order_id || invoice.order_id,
       wait_for_invoice: false,
