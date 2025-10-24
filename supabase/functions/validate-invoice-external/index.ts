@@ -72,13 +72,13 @@ Deno.serve(async (req: Request) => {
       .from("external_invoice_api_config")
       .select("*")
       .eq("is_active", true)
-      .eq("config_type", "dgi_validation");
+      .eq("config_type", "validation");
 
     if (config_id) {
       configQuery = configQuery.eq("id", config_id);
     }
 
-    console.log("🔍 Buscando configuración de dgi_validation...");
+    console.log("🔍 Buscando configuración de validación DGI...");
 
     const { data: configs, error: configError } = await configQuery;
 
