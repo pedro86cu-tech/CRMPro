@@ -29,10 +29,17 @@ export function useInvoicePdfQueue() {
           console.log(`📄 Encontradas ${pendingPdfs.length} facturas pendientes de envío de PDF, procesando...`);
 
           for (const pdfJob of pendingPdfs) {
+            console.log(`📤 Procesando PDF para factura ${pdfJob.invoice_id}...`);
+
             await supabase
               .from('invoice_pdf_queue')
               .update({ status: 'processing' })
               .eq('id', pdfJob.id);
+
+            console.log(`🔌 Invocando edge function 'send-invoice-pdf' con:`, {
+              invoice_id: pdfJob.invoice_id,
+              config_id: pdfJob.config_id
+            });
 
             const { data, error } = await supabase.functions.invoke('send-invoice-pdf', {
               body: {
@@ -40,6 +47,8 @@ export function useInvoicePdfQueue() {
                 config_id: pdfJob.config_id,
               },
             });
+
+            console.log('📥 Respuesta de edge function:', { data, error });
 
             if (error) {
               console.error('❌ Error enviando PDF:', error);
@@ -53,6 +62,8 @@ export function useInvoicePdfQueue() {
                 .eq('id', pdfJob.id);
             } else if (data?.success) {
               console.log('✅ PDF enviado exitosamente:', data.pdf_id);
+            } else {
+              console.warn('⚠️ Respuesta inesperada:', data);
             }
           }
 
