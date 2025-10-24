@@ -25,6 +25,7 @@ import { ExternalValidationModule } from './components/Settings/ExternalValidati
 import { useTwilioDevice } from './hooks/useTwilioDevice';
 import { useInvoiceAutoValidation } from './hooks/useInvoiceAutoValidation';
 import { useInvoiceEmailQueue } from './hooks/useInvoiceEmailQueue';
+import { useInvoicePdfQueue } from './hooks/useInvoicePdfQueue';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -55,6 +56,7 @@ function MainApp() {
 
   useInvoiceAutoValidation();
   useInvoiceEmailQueue();
+  useInvoicePdfQueue();
 
 
   const handleAcceptIncomingCall = (call: any) => {

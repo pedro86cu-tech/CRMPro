@@ -21,6 +21,7 @@ interface APIConfig {
   timeout: number;
   retry_attempts: number;
   is_active: boolean;
+  config_type: 'validation' | 'pdf_generation';
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +70,7 @@ export function ExternalValidationModule() {
     timeout: 30000,
     retry_attempts: 3,
     is_active: true,
+    config_type: 'validation',
   });
 
   useEffect(() => {
@@ -173,7 +175,10 @@ export function ExternalValidationModule() {
     setTesting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('validate-invoice-external', {
+      const isPdfConfig = selectedConfig?.config_type === 'pdf_generation';
+      const functionName = isPdfConfig ? 'send-invoice-pdf' : 'validate-invoice-external';
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
         body: {
           invoice_id: testInvoiceId,
           config_id: selectedConfig?.id,
@@ -186,19 +191,26 @@ export function ExternalValidationModule() {
         return;
       }
 
-      console.group('📤 REQUEST ENVIADO A DGI');
+      const logTitle = isPdfConfig ? 'GENERACIÓN DE PDF' : 'VALIDACIÓN DGI';
+
+      console.group(`📤 REQUEST ENVIADO - ${logTitle}`);
       console.log('🔹 Factura ID:', testInvoiceId);
       console.log('🔹 Config ID:', selectedConfig?.id);
+      console.log('🔹 Tipo:', isPdfConfig ? 'PDF Generation' : 'DGI Validation');
       if (data?.request_payload) {
         console.log('🔹 JSON enviado:');
         console.log(JSON.stringify(data.request_payload, null, 2));
       }
       console.groupEnd();
 
-      console.group('📥 RESPONSE RECIBIDA DE DGI');
+      console.group(`📥 RESPONSE RECIBIDA - ${logTitle}`);
       console.log('🔹 Status Code:', data?.status_code);
       console.log('🔹 Success:', data?.success);
-      console.log('🔹 Validation Result:', data?.validation_result);
+      if (isPdfConfig && data?.pdf_id) {
+        console.log('🔹 PDF ID:', data.pdf_id);
+      } else if (!isPdfConfig && data?.validation_result) {
+        console.log('🔹 Validation Result:', data.validation_result);
+      }
       if (data?.response_payload) {
         console.log('🔹 JSON recibido:');
         console.log(JSON.stringify(data.response_payload, null, 2));
@@ -206,18 +218,22 @@ export function ExternalValidationModule() {
       console.groupEnd();
 
       if (data?.success) {
-        const result = data.validation_result || 'pendiente';
-        toast.success(`✅ Validación exitosa! Estado: ${result}`);
+        if (isPdfConfig) {
+          toast.success(`✅ PDF enviado exitosamente! ${data.pdf_id ? `ID: ${data.pdf_id}` : ''}`);
+        } else {
+          const result = data.validation_result || 'pendiente';
+          toast.success(`✅ Validación exitosa! Estado: ${result}`);
+        }
 
-        if (data.external_reference) {
-          console.log('✅ Referencia externa:', data.external_reference);
+        if (data.external_reference || data.pdf_id) {
+          console.log('✅ Referencia externa:', data.external_reference || data.pdf_id);
         }
       } else {
         const errorMsg = data?.error || data?.message || 'Error desconocido';
         const statusCode = data?.status_code;
 
         if (statusCode === 500) {
-          toast.error(`❌ Error del servidor DGI (HTTP 500). La API externa tiene problemas. Revisa los logs para más detalles.`);
+          toast.error(`❌ Error del servidor (HTTP 500). La API externa tiene problemas. Revisa los logs para más detalles.`);
         } else if (statusCode === 401 || statusCode === 403) {
           toast.error(`❌ Error de autenticación (HTTP ${statusCode}). Verifica las credenciales en la configuración.`);
         } else if (statusCode === 400) {
@@ -228,7 +244,7 @@ export function ExternalValidationModule() {
           toast.error(`❌ Error: ${errorMsg} ${statusCode ? `(HTTP ${statusCode})` : ''}`);
         }
 
-        console.group('🔍 Detalles del Error de Validación');
+        console.group('🔍 Detalles del Error');
         console.error('Error completo:', data);
         console.log('Status code:', statusCode);
         console.log('Mensaje:', errorMsg);
@@ -277,9 +293,9 @@ export function ExternalValidationModule() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center">
             <Shield className="mr-3 text-teal-600" size={32} />
-            Validación Externa de Facturas
+            Validación y Envío de Facturas
           </h1>
-          <p className="text-slate-600 mt-1">Configure la integración con sistemas externos de validación</p>
+          <p className="text-slate-600 mt-1">Configure la integración con DGI y sistemas de generación de PDFs</p>
         </div>
         <button
           onClick={() => {
@@ -295,6 +311,7 @@ export function ExternalValidationModule() {
               timeout: 30000,
               retry_attempts: 3,
               is_active: true,
+              config_type: 'validation',
             });
             setShowConfigModal(true);
           }}
@@ -342,6 +359,11 @@ export function ExternalValidationModule() {
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
                     <h3 className="text-lg font-semibold text-slate-900">{config.name}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                      config.config_type === 'pdf_generation' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {config.config_type === 'pdf_generation' ? 'Generación PDF' : 'Validación DGI'}
+                    </span>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                       config.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
                     }`}>
@@ -519,6 +541,20 @@ export function ExternalValidationModule() {
                     placeholder="https://api.example.com/validate"
                     required
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Tipo de Configuración
+                  </label>
+                  <select
+                    value={formData.config_type}
+                    onChange={(e) => setFormData({ ...formData, config_type: e.target.value as any })}
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2"
+                  >
+                    <option value="validation">Validación DGI</option>
+                    <option value="pdf_generation">Generación de PDF</option>
+                  </select>
                 </div>
 
                 <div>
