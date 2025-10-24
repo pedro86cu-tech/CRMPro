@@ -48,7 +48,8 @@ Deno.serve(async (req: Request) => {
       .select(`
         *,
         clients (*),
-        orders (*)
+        orders (*),
+        partners (*)
       `)
       .eq("id", invoice_id)
       .single();
@@ -115,10 +116,30 @@ Deno.serve(async (req: Request) => {
     });
 
     // Obtener tax_rate de la orden si existe
-    const defaultTaxRate = invoice.orders?.tax_rate || 22;
+    const defaultTaxRate = invoice.orders?.tax_rate || invoice.commission_iva_rate || 22;
 
     // Construir items con IVA incluido
-    const items = (orderItems || []).map((item: any) => {
+    let items = [];
+
+    // Si es factura de comisiones y no hay order_items, crear item sintético
+    if (invoice.is_commission_invoice && (!orderItems || orderItems.length === 0)) {
+      const subtotal = parseFloat(String(invoice.subtotal || 0));
+      const ivaPorcentaje = parseFloat(String(invoice.commission_iva_rate || defaultTaxRate));
+      const iva = parseFloat(String(invoice.tax_amount || 0));
+      const total = parseFloat(String(invoice.total_amount || 0));
+
+      items.push({
+        descripcion: invoice.notes || "Comisión por ventas",
+        cantidad: 1,
+        precio_unitario: Math.round(subtotal * 100) / 100,
+        iva_porcentaje: ivaPorcentaje,
+        subtotal: Math.round(subtotal * 100) / 100,
+        iva: Math.round(iva * 100) / 100,
+        total: Math.round(total * 100) / 100
+      });
+    } else {
+      // Procesar order_items normales
+      items = (orderItems || []).map((item: any) => {
       const cantidad = parseFloat(String(item.quantity || 1));
       const precioUnitario = parseFloat(String(item.unit_price || 0));
       const ivaPorcentaje = parseFloat(String(item.tax_rate || defaultTaxRate));
@@ -135,7 +156,8 @@ Deno.serve(async (req: Request) => {
         iva: Math.round(ivaItem * 100) / 100,
         total: Math.round(totalItem * 100) / 100
       };
-    });
+      });
+    }
 
     // Si hay costo de envío, agregarlo como un item adicional
     const shippingCost = parseFloat(String(invoice.orders?.shipping_cost || 0));
@@ -170,19 +192,42 @@ Deno.serve(async (req: Request) => {
     console.log("Invoice total_amount:", invoice.total_amount);
     console.log("Items detalle:", JSON.stringify(items, null, 2));
 
+    // Determinar datos del emisor (empresa que emite la factura)
+    const emisorRut = "211234560018"; // RUT fijo de la empresa emisora
+    const emisorRazonSocial = "Empresa Demo S.A."; // Razón social fija
+
+    // Determinar moneda
+    const moneda = invoice.orders?.currency || "UYU";
+
+    // Determinar receptor (cliente o partner)
+    let receptorRut = "";
+    let receptorRazonSocial = "";
+
+    if (invoice.is_commission_invoice && invoice.partners) {
+      // Para facturas de comisiones, el receptor es el partner
+      receptorRut = invoice.partners.rut || "";
+      receptorRazonSocial = invoice.partners.company_name || invoice.partners.name || "";
+    } else if (invoice.clients) {
+      // Para facturas normales, el receptor es el cliente
+      receptorRut = invoice.clients.tax_id || "";
+      receptorRazonSocial = invoice.clients.company_name || `${invoice.clients.first_name || ""} ${invoice.clients.last_name || ""}`.trim();
+    }
+
     const requestPayload = {
       numero_cfe: invoice.invoice_number,
-      serie: invoice.serie_cfe || "A",
-      rut_emisor: invoice.rut_emisor || "211234560018",
-      razon_social_emisor: invoice.company_name || "Empresa Demo S.A.",
-      fecha_emision: invoice.issue_date || new Date().toISOString(),
-      moneda: invoice.currency || "UYU",
+      serie: "A",
+      rut_emisor: emisorRut,
+      razon_social_emisor: emisorRazonSocial,
+      rut_receptor: receptorRut,
+      razon_social_receptor: receptorRazonSocial,
+      fecha_emision: invoice.issue_date || new Date().toISOString().split('T')[0],
+      moneda: moneda,
       subtotal: Math.round(calculatedSubtotal * 100) / 100,
       iva: Math.round(calculatedIva * 100) / 100,
       total: Math.round(calculatedTotal * 100) / 100,
       items: items,
       datos_adicionales: {
-        observaciones: invoice.notes || "Venta al público",
+        observaciones: invoice.notes || (invoice.is_commission_invoice ? "Factura de comisiones" : "Venta al público"),
         forma_pago: invoice.orders?.payment_method || "Contado"
       }
     };
