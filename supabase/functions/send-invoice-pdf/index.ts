@@ -136,17 +136,10 @@ Deno.serve(async (req: Request) => {
     const calculatedTotal = items.reduce((sum, item) => sum + item.total, 0);
 
     const requestPayload = {
-      order_id: invoice.orders?.dogcatify_order_id || invoice.order_id,
-      pdf_template_name: "invoice_email_service",
+      template_name: "invoice_email_service",
       recipient_email: invoice.clients?.email || "",
-      external_reference_id: invoice.invoice_number,
-      external_system: "billing_system",
-      webhook_url: "",
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      pending_fields: [
-        "invoice_pdf",
-        "invoice_number"
-      ],
+      order_id: invoice.orders?.dogcatify_order_id || invoice.order_id,
+      wait_for_invoice: false,
       data: {
         response_payload: {
           success: invoice.dgi_estado ? true : false,
