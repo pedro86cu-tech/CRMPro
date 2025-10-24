@@ -139,20 +139,28 @@ Deno.serve(async (req: Request) => {
       order_id: invoice.orders?.dogcatify_order_id || invoice.order_id,
       pdf_template_name: "invoice_email_service",
       recipient_email: invoice.clients?.email || "",
+      external_reference_id: invoice.invoice_number,
+      external_system: "billing_system",
+      webhook_url: "",
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      pending_fields: [
+        "invoice_pdf",
+        "invoice_number"
+      ],
       data: {
         response_payload: {
-          success: true,
+          success: invoice.dgi_estado ? true : false,
           approved: invoice.dgi_estado === 'aprobado',
-          reference: invoice.numero_cfe || "",
-          numero_cfe: invoice.numero_cfe || "",
+          reference: invoice.numero_cfe || invoice.invoice_number || "",
+          numero_cfe: invoice.numero_cfe || invoice.invoice_number || "",
           serie_cfe: invoice.serie_cfe || "A",
           tipo_cfe: invoice.tipo_cfe || "101",
           cae: invoice.cae || "",
           vencimiento_cae: invoice.vencimiento_cae || "",
           qr_code: invoice.qr_code || "",
-          dgi_estado: invoice.dgi_estado || "aprobado",
+          dgi_estado: invoice.dgi_estado || "pendiente",
           dgi_codigo_autorizacion: invoice.dgi_codigo_autorizacion || "",
-          dgi_mensaje: invoice.dgi_mensaje || "Comprobante aprobado correctamente",
+          dgi_mensaje: invoice.dgi_mensaje || (invoice.dgi_estado === 'aprobado' ? "Comprobante aprobado correctamente" : "Pendiente de validación"),
           dgi_id_efactura: invoice.dgi_id_efactura || "",
           dgi_fecha_validacion: invoice.dgi_fecha_validacion || new Date().toISOString()
         },
@@ -169,18 +177,10 @@ Deno.serve(async (req: Request) => {
         },
         items: items,
         datos_adicionales: {
-          observaciones: invoice.notes || invoice.observations || "Venta al público",
-          forma_pago: invoice.orders?.payment_method || "Efectivo"
+          observaciones: invoice.notes || invoice.observations || "",
+          forma_pago: invoice.orders?.payment_method || "mercadopago"
         }
-      },
-      pending_fields: [
-        "invoice_pdf",
-        "invoice_number"
-      ],
-      external_reference_id: invoice.invoice_number,
-      external_system: "billing_system",
-      webhook_url: "",
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      }
     };
 
     console.log("Request payload (PDF Generation format):", JSON.stringify(requestPayload, null, 2));
