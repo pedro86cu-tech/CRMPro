@@ -218,14 +218,10 @@ export function CommissionBillingModule() {
           subtotal: subtotal,
           tax_amount: taxAmount,
           total_amount: totalAmount,
-          currency: 'UYU',
           status: 'draft',
           is_commission_invoice: true,
           commission_iva_rate: ivaRate,
-          notes: `Factura de comisiones - ${selectedGroup.invoices.length} facturas procesadas`,
-          company_name: partner.company_name || partner.name,
-          rut_emisor: '211234560018',
-          serie_cfe: 'A'
+          notes: `Factura de comisiones - ${selectedGroup.invoices.length} facturas procesadas`
         })
         .select()
         .single();
