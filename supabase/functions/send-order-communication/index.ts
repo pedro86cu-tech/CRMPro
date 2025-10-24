@@ -44,7 +44,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Buscar la orden
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select("*")
@@ -67,7 +66,6 @@ Deno.serve(async (req: Request) => {
 
     console.log("✅ Orden encontrada:", order.id, order.order_number);
 
-    // Obtener configuración de Email Communication
     const { data: emailConfig } = await supabase
       .from("external_invoice_api_config")
       .select("*")
@@ -78,7 +76,6 @@ Deno.serve(async (req: Request) => {
     if (!emailConfig) {
       console.error("❌ No hay configuración activa de Email Communication");
       
-      // Actualizar orden a sent-error-email
       await supabase
         .from("orders")
         .update({ status: "sent-error-email" })
@@ -98,7 +95,6 @@ Deno.serve(async (req: Request) => {
 
     console.log("🔧 Configuración Email encontrada:", emailConfig.name, emailConfig.api_url);
 
-    // Preparar el payload para pending-communication
     const communicationPayload = {
       template_name,
       recipient_email,
@@ -107,7 +103,6 @@ Deno.serve(async (req: Request) => {
       data: data || {},
     };
 
-    // Registrar en external_invoice_validation_log ANTES de llamar
     const { data: logEntry, error: logError } = await supabase
       .from("external_invoice_validation_log")
       .insert({
@@ -128,16 +123,13 @@ Deno.serve(async (req: Request) => {
       console.log("📝 Log creado:", logEntry.id);
     }
 
-    // Llamar a la API externa pending-communication
     console.log("🚀 Llamando a pending-communication:", emailConfig.api_url);
 
-    // Preparar headers con autenticación
     const fetchHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       ...emailConfig.headers || {},
     };
 
-    // Agregar autenticación según el tipo configurado
     if (emailConfig.auth_type === 'api_key' && emailConfig.auth_credentials) {
       const { key, value } = emailConfig.auth_credentials;
       fetchHeaders[key] = value;
@@ -169,10 +161,12 @@ Deno.serve(async (req: Request) => {
 
       console.log("📨 Respuesta de pending-communication:", communicationResult);
 
-      // Verificar si success es false en la respuesta
-      const isSuccess = communicationResponse.ok && communicationResult.success !== false;
+      const isSuccess = communicationResponse.ok &&
+                       (communicationResult.success === true ||
+                        communicationResult.success === undefined);
 
-      // Actualizar el log con la respuesta
+      console.log(`✅ Análisis de respuesta: HTTP ${communicationResponse.status}, success=${communicationResult.success}, isSuccess=${isSuccess}`);
+
       if (logEntry) {
         await supabase
           .from("external_invoice_validation_log")
@@ -186,18 +180,17 @@ Deno.serve(async (req: Request) => {
           .eq("id", logEntry.id);
       }
 
-      // Si la respuesta indica fallo (success: false), actualizar orden
       if (!isSuccess) {
         console.error("❌ Error en pending-communication - Actualizando orden a sent-error-email");
-        
+
         await supabase
           .from("orders")
           .update({ status: "sent-error-email" })
           .eq("id", order_id);
-        
+
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             error: "Error en la comunicación por email",
             status: communicationResponse.status,
             details: communicationResult,
@@ -212,7 +205,6 @@ Deno.serve(async (req: Request) => {
 
       console.log("✅ Comunicación enviada exitosamente - Actualizando orden a 'shipped'");
 
-      // Actualizar orden a shipped cuando la comunicación se envía exitosamente
       await supabase
         .from("orders")
         .update({ status: "shipped" })
@@ -238,13 +230,11 @@ Deno.serve(async (req: Request) => {
     } catch (fetchError) {
       console.error("❌ Error llamando a pending-communication:", fetchError);
       
-      // Actualizar orden a sent-error-email en caso de error de red
       await supabase
         .from("orders")
         .update({ status: "sent-error-email" })
         .eq("id", order_id);
       
-      // Actualizar log si existe
       if (logEntry) {
         await supabase
           .from("external_invoice_validation_log")
