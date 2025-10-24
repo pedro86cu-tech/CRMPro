@@ -198,7 +198,13 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      console.log("✅ Comunicación enviada exitosamente");
+      console.log("✅ Comunicación enviada exitosamente - Actualizando orden a 'shipped'");
+
+      // Actualizar orden a shipped cuando la comunicación se envía exitosamente
+      await supabase
+        .from("orders")
+        .update({ status: "shipped" })
+        .eq("id", order_id);
 
       return new Response(
         JSON.stringify({
@@ -208,6 +214,7 @@ Deno.serve(async (req: Request) => {
           template_name,
           recipient_email,
           communication_response: communicationResult,
+          order_status_updated: "shipped",
           message: "Comunicación enviada exitosamente",
         }),
         {
