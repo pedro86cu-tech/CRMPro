@@ -107,16 +107,16 @@ Deno.serve(async (req: Request) => {
       data: data || {},
     };
 
-    // Registrar en external_validation_logs ANTES de llamar
+    // Registrar en external_invoice_validation_log ANTES de llamar
     const { data: logEntry, error: logError } = await supabase
-      .from("external_validation_logs")
+      .from("external_invoice_validation_log")
       .insert({
         config_id: emailConfig.id,
         invoice_id: null,
         request_payload: communicationPayload,
         response_payload: null,
         status_code: null,
-        success: null,
+        status: 'pending',
         external_reference: order_id,
       })
       .select()
@@ -175,11 +175,10 @@ Deno.serve(async (req: Request) => {
       // Actualizar el log con la respuesta
       if (logEntry) {
         await supabase
-          .from("external_validation_logs")
+          .from("external_invoice_validation_log")
           .update({
             response_payload: communicationResult,
             status_code: communicationResponse.status,
-            success: isSuccess,
             status: isSuccess ? "success" : "error",
             validation_result: isSuccess ? "approved" : "rejected",
             duration_ms: duration,
@@ -248,11 +247,10 @@ Deno.serve(async (req: Request) => {
       // Actualizar log si existe
       if (logEntry) {
         await supabase
-          .from("external_validation_logs")
+          .from("external_invoice_validation_log")
           .update({
             response_payload: { error: fetchError.message },
             status_code: 0,
-            success: false,
             status: "error",
             validation_result: "rejected",
             duration_ms: Date.now() - startTime,
