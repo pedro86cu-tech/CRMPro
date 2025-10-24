@@ -93,7 +93,10 @@ export function ExternalValidationModule() {
   const fetchLogs = async () => {
     const { data, error } = await supabase
       .from('external_invoice_validation_log')
-      .select('*')
+      .select(`
+        *,
+        config:external_invoice_api_config(name, config_type)
+      `)
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -427,6 +430,9 @@ export function ExternalValidationModule() {
                     Fecha/Hora
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Tipo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Estado
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -451,6 +457,15 @@ export function ExternalValidationModule() {
                   <tr key={log.id} className="hover:bg-slate-50 transition">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
                       {new Date(log.created_at).toLocaleString('es-UY')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        log.config?.config_type === 'pdf_generation'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {log.config?.config_type === 'pdf_generation' ? 'PDF' : 'DGI'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(log.status)}`}>
