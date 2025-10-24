@@ -130,18 +130,31 @@ Deno.serve(async (req: Request) => {
 
     // Llamar a la API externa pending-communication
     console.log("🚀 Llamando a pending-communication:", emailConfig.api_url);
-    
+
+    // Preparar headers con autenticación
+    const fetchHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...emailConfig.headers || {},
+    };
+
+    // Agregar autenticación según el tipo configurado
+    if (emailConfig.auth_type === 'api_key' && emailConfig.auth_credentials) {
+      const { key, value } = emailConfig.auth_credentials;
+      fetchHeaders[key] = value;
+    } else if (emailConfig.auth_type === 'bearer' && emailConfig.auth_credentials?.token) {
+      fetchHeaders['Authorization'] = `Bearer ${emailConfig.auth_credentials.token}`;
+    }
+
+    console.log("🔑 Headers preparados:", Object.keys(fetchHeaders).join(', '));
+
     const startTime = Date.now();
     let communicationResponse;
     let communicationResult: any;
-    
+
     try {
       communicationResponse = await fetch(emailConfig.api_url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(emailConfig.api_key ? { "Authorization": `Bearer ${emailConfig.api_key}` } : {}),
-        },
+        headers: fetchHeaders,
         body: JSON.stringify(communicationPayload),
       });
       
