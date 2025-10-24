@@ -55,7 +55,7 @@ function MainApp() {
   const { isReady, device, activeCall, makeCall } = useTwilioDevice();
 
   useInvoiceAutoValidation();
-  useInvoiceEmailQueue();
+  // useInvoiceEmailQueue(); // DESHABILITADO: Usamos API externa generate-pdf que envía emails
   useInvoicePdfQueue();
 
 
