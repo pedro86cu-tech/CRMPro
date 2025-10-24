@@ -708,20 +708,20 @@ export function ExternalValidationModule() {
                 </div>
 
                 <div className="col-span-2 border-t border-slate-200 pt-6">
-                  <h3 className="text-base font-semibold text-slate-900 mb-4">Configuración de Respuesta</h3>
+                  <h3 className="text-base font-semibold text-slate-900 mb-4">Configuración de Request y Response</h3>
                 </div>
 
-                <div className="col-span-2 bg-blue-50 rounded-lg p-6 border border-blue-200">
-                  <h3 className="text-sm font-semibold text-blue-900 mb-2 flex items-center space-x-2">
-                    <FileText size={16} />
-                    <span>Formato e-Ticket (Hardcodeado)</span>
-                  </h3>
-                  <p className="text-xs text-blue-800 mb-3">
-                    El formato de envío está configurado automáticamente en el código para e-Tickets (ventas al público).
-                    No necesitas mapear campos manualmente.
-                  </p>
-                  <div className="bg-white rounded p-3 text-xs font-mono text-slate-700">
-                    <pre className="whitespace-pre-wrap">{`{
+                {formData.config_type === 'validation' ? (
+                  <div className="col-span-2 bg-blue-50 rounded-lg p-6 border border-blue-200">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-2 flex items-center space-x-2">
+                      <FileText size={16} />
+                      <span>Formato Request - Validación DGI (e-Ticket)</span>
+                    </h3>
+                    <p className="text-xs text-blue-800 mb-3">
+                      El formato de envío está configurado automáticamente para e-Tickets (ventas al público).
+                    </p>
+                    <div className="bg-white rounded p-3 text-xs font-mono text-slate-700 overflow-x-auto">
+                      <pre className="whitespace-pre-wrap">{`{
   "numero_cfe": "[Número de factura]",
   "serie": "A",
   "rut_emisor": "[RUT emisor]",
@@ -737,26 +737,147 @@ export function ExternalValidationModule() {
     "forma_pago": "Contado"
   }
 }`}</pre>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="col-span-2 bg-purple-50 rounded-lg p-6 border border-purple-200">
+                    <h3 className="text-sm font-semibold text-purple-900 mb-2 flex items-center space-x-2">
+                      <FileText size={16} />
+                      <span>Formato Request - Generación de PDF</span>
+                    </h3>
+                    <p className="text-xs text-purple-800 mb-3">
+                      El formato de envío está configurado automáticamente para generar PDFs con los datos de DGI.
+                    </p>
+                    <div className="bg-white rounded p-3 text-xs font-mono text-slate-700 overflow-x-auto max-h-96 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap">{`{
+  "order_id": "ORDER-80000",
+  "pdf_template_name": "invoice_email_service",
+  "recipient_email": "cliente@ejemplo.com",
+  "data": {
+    "response_payload": {
+      "success": true,
+      "approved": true,
+      "reference": "CFE-123456789",
+      "numero_cfe": "101000001",
+      "serie_cfe": "A",
+      "tipo_cfe": "101",
+      "cae": "12345678901234",
+      "vencimiento_cae": "2025-10-29",
+      "qr_code": "https://servicios.dgi.gub.uy/cfe?id=...",
+      "dgi_estado": "aprobado",
+      "dgi_codigo_autorizacion": "AUTH12345",
+      "dgi_mensaje": "Comprobante aprobado correctamente",
+      "dgi_id_efactura": "EF-987654321",
+      "dgi_fecha_validacion": "2025-10-22T14:35:22Z"
+    },
+    "issuer": {
+      "numero_cfe": "INV-1729567890",
+      "serie": "A",
+      "rut": "211234560018",
+      "razon_social": "Empresa Demo S.A.",
+      "fecha_emision": "2025-10-22",
+      "moneda": "UYU",
+      "subtotal": 819.67,
+      "iva": 180.33,
+      "total": 1000.00
+    },
+    "items": [
+      {
+        "descripcion": "Producto o Servicio",
+        "cantidad": 2,
+        "precio_unitario": 409.84,
+        "iva_porcentaje": 22,
+        "subtotal": 819.68,
+        "iva": 180.33,
+        "total": 1000.00
+      }
+    ],
+    "datos_adicionales": {
+      "observaciones": "Venta al público",
+      "forma_pago": "Efectivo"
+    }
+  },
+  "pending_fields": ["invoice_pdf", "invoice_number"],
+  "external_reference_id": "INVOICE-12345",
+  "external_system": "billing_system",
+  "webhook_url": "",
+  "expires_at": "2025-10-25T23:59:59Z"
+}`}</pre>
+                    </div>
+                  </div>
+                )}
 
-                <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
-                  <FieldMapper
-                    title="Mapeo de Response (Captura de Respuesta)"
-                    mappings={formData.response_mapping || {}}
-                    onChange={(mappings) => setFormData({ ...formData, response_mapping: mappings })}
-                    availableFields={RESPONSE_AVAILABLE_FIELDS}
-                    placeholder="Seleccione campo a guardar"
-                    isResponse={true}
-                  />
-                </div>
+                {formData.config_type === 'validation' ? (
+                  <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
+                    <FieldMapper
+                      title="Mapeo de Response (Captura de Respuesta DGI)"
+                      mappings={formData.response_mapping || {}}
+                      onChange={(mappings) => setFormData({ ...formData, response_mapping: mappings })}
+                      availableFields={RESPONSE_AVAILABLE_FIELDS}
+                      placeholder="Seleccione campo a guardar"
+                      isResponse={true}
+                    />
+                    <div className="mt-4 bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-2">Ejemplo de Response DGI</h4>
+                      <div className="bg-white rounded p-3 text-xs font-mono text-slate-700 overflow-x-auto">
+                        <pre className="whitespace-pre-wrap">{`{
+  "success": true,
+  "approved": true,
+  "reference": "CFE-123456789",
+  "numero_cfe": "101000001",
+  "serie_cfe": "A",
+  "tipo_cfe": "101",
+  "cae": "12345678901234",
+  "vencimiento_cae": "2025-10-29",
+  "qr_code": "https://servicios.dgi.gub.uy/cfe?id=abc123...",
+  "dgi_estado": "aprobado",
+  "dgi_codigo_autorizacion": "AUTH12345",
+  "dgi_mensaje": "Comprobante aprobado correctamente",
+  "dgi_id_efactura": "EF-987654321",
+  "dgi_fecha_validacion": "2025-10-22T14:35:22Z"
+}`}</pre>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-semibold text-slate-900 mb-2">Response de Generación de PDF</h3>
+                      <p className="text-xs text-slate-600 mb-3">
+                        El sistema solo valida que <code className="bg-slate-200 px-1 py-0.5 rounded">success: true</code> en la respuesta.
+                        El PDF se genera y envía desde el sistema externo, no necesitas guardarlo aquí.
+                      </p>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                      <h4 className="text-sm font-semibold text-purple-900 mb-2">Ejemplo de Response - Generación de PDF</h4>
+                      <div className="bg-white rounded p-3 text-xs font-mono text-slate-700 overflow-x-auto">
+                        <pre className="whitespace-pre-wrap">{`{
+  "success": true,
+  "message": "PDF generated successfully",
+  "data": {
+    "pdf_id": "920f780c-5436-47e4-9047-562d904f4027",
+    "pdf_base64": "JVBERi0xLjQKJeL.......",
+    "filename": "Factura_.pdf",
+    "size_bytes": 1746964
+  }
+}`}</pre>
+                      </div>
+                      <div className="mt-3 p-3 bg-purple-100 rounded text-xs text-purple-800">
+                        <strong>Nota:</strong> Solo se verifica que <code className="bg-purple-200 px-1 py-0.5 rounded">success === true</code>.
+                        El PDF no se guarda en este sistema, el envío por email lo gestiona el sistema externo.
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {selectedConfig && (
                 <div className="border-t border-slate-200 pt-6">
                   <h3 className="text-sm font-medium text-slate-700 mb-3">Probar Configuración</h3>
                   <p className="text-xs text-slate-500 mb-3">
-                    Selecciona una factura existente para probar la validación con DGI
+                    {selectedConfig.config_type === 'pdf_generation'
+                      ? 'Selecciona una factura aprobada para probar el envío de PDF'
+                      : 'Selecciona una factura existente para probar la validación con DGI'}
                   </p>
                   <div className="flex space-x-2">
                     <select
@@ -785,7 +906,9 @@ export function ExternalValidationModule() {
                   {testInvoiceId && (
                     <div className="mt-2 space-y-1">
                       <p className="text-xs text-slate-400">
-                        ℹ️ La factura seleccionada será validada con la API de DGI configurada
+                        ℹ️ {selectedConfig.config_type === 'pdf_generation'
+                          ? 'La factura seleccionada será enviada a la API de generación de PDF'
+                          : 'La factura seleccionada será validada con la API de DGI configurada'}
                       </p>
                       <p className="text-xs text-green-600 font-medium">
                         🖥️ El JSON enviado y recibido se mostrará en la consola del navegador (F12)
@@ -793,17 +916,31 @@ export function ExternalValidationModule() {
                     </div>
                   )}
 
-                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 className="text-sm font-semibold text-blue-900 mb-2">💡 Solución de Problemas</h4>
-                    <ul className="text-xs text-blue-800 space-y-1">
-                      <li><strong>HTTP 500:</strong> La API de DGI tiene problemas internos. Verifica la URL y contacta soporte de DGI.</li>
-                      <li><strong>HTTP 401/403:</strong> Error de autenticación. Verifica usuario, contraseña o token en la configuración.</li>
-                      <li><strong>HTTP 400:</strong> Request inválido. Verifica el mapeo de campos y que los datos enviados sean correctos.</li>
+                  <div className={`mt-4 p-4 rounded-lg border ${
+                    selectedConfig.config_type === 'pdf_generation'
+                      ? 'bg-purple-50 border-purple-200'
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <h4 className={`text-sm font-semibold mb-2 ${
+                      selectedConfig.config_type === 'pdf_generation' ? 'text-purple-900' : 'text-blue-900'
+                    }`}>
+                      💡 Solución de Problemas
+                    </h4>
+                    <ul className={`text-xs space-y-1 ${
+                      selectedConfig.config_type === 'pdf_generation' ? 'text-purple-800' : 'text-blue-800'
+                    }`}>
+                      <li><strong>HTTP 500:</strong> La API externa tiene problemas internos. Verifica la URL y contacta soporte.</li>
+                      <li><strong>HTTP 401/403:</strong> Error de autenticación. Verifica las credenciales en la configuración.</li>
+                      <li><strong>HTTP 400:</strong> Request inválido. Verifica que los datos enviados sean correctos.</li>
                       <li><strong>HTTP 404:</strong> URL incorrecta. Verifica que la URL de la API sea la correcta.</li>
                       <li><strong>Timeout:</strong> La API no responde a tiempo. Aumenta el timeout en configuración.</li>
                     </ul>
-                    <p className="text-xs text-blue-700 mt-3 pt-2 border-t border-blue-200">
-                      📋 <strong>Tip:</strong> Abre la pestaña "Logs" para ver el request enviado y la response recibida de DGI.
+                    <p className={`text-xs mt-3 pt-2 border-t ${
+                      selectedConfig.config_type === 'pdf_generation'
+                        ? 'text-purple-700 border-purple-200'
+                        : 'text-blue-700 border-blue-200'
+                    }`}>
+                      📋 <strong>Tip:</strong> Abre la pestaña "Logs" para ver el request enviado y la response recibida.
                     </p>
                   </div>
                 </div>
