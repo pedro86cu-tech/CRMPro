@@ -309,6 +309,28 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
+    if (status === "success") {
+      await supabase
+        .from("invoices")
+        .update({
+          status: "sent",
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", invoice_id);
+
+      console.log(`✅ Factura ${invoice_id} marcada como 'sent'`);
+    } else {
+      await supabase
+        .from("invoices")
+        .update({
+          status: "sent-error",
+          observations: `Error al enviar PDF: ${errorMessage || "Error desconocido"}`
+        })
+        .eq("id", invoice_id);
+
+      console.log(`❌ Factura ${invoice_id} marcada como 'sent-error': ${errorMessage}`);
+    }
+
     return new Response(
       JSON.stringify({
         success: status === "success",
