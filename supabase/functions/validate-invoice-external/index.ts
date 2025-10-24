@@ -71,17 +71,31 @@ Deno.serve(async (req: Request) => {
     let configQuery = supabase
       .from("external_invoice_api_config")
       .select("*")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("config_type", "dgi_validation");
 
     if (config_id) {
       configQuery = configQuery.eq("id", config_id);
     }
 
+    console.log("🔍 Buscando configuración de dgi_validation...");
+
     const { data: configs, error: configError } = await configQuery;
 
+    console.log("📋 Resultados de configuración:", {
+      error: configError,
+      configsFound: configs?.length || 0,
+      configs: configs?.map(c => ({
+        id: c.id,
+        name: c.name,
+        config_type: c.config_type
+      }))
+    });
+
     if (configError || !configs || configs.length === 0) {
+      console.error("❌ No se encontró configuración de DGI:", configError);
       return new Response(
-        JSON.stringify({ error: "No hay configuración activa disponible" }),
+        JSON.stringify({ error: "No hay configuración de DGI activa disponible" }),
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -90,6 +104,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const config = configs[0];
+    console.log("✅ Configuración seleccionada:", {
+      id: config.id,
+      name: config.name,
+      config_type: config.config_type,
+      api_url: config.api_url
+    });
 
     // Obtener tax_rate de la orden si existe
     const defaultTaxRate = invoice.orders?.tax_rate || 22;
