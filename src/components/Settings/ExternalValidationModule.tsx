@@ -21,7 +21,7 @@ interface APIConfig {
   timeout: number;
   retry_attempts: number;
   is_active: boolean;
-  config_type: 'validation' | 'pdf_generation';
+  config_type: 'validation' | 'pdf_generation' | 'email_communication';
   created_at: string;
   updated_at: string;
 }
@@ -370,9 +370,13 @@ export function ExternalValidationModule() {
                   <div className="flex items-center space-x-3">
                     <h3 className="text-lg font-semibold text-slate-900">{config.name}</h3>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      config.config_type === 'pdf_generation' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                      config.config_type === 'pdf_generation'
+                        ? 'bg-purple-100 text-purple-700'
+                        : config.config_type === 'email_communication'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-blue-100 text-blue-700'
                     }`}>
-                      {config.config_type === 'pdf_generation' ? 'Generación PDF' : 'Validación DGI'}
+                      {config.config_type === 'pdf_generation' ? 'Generación PDF' : config.config_type === 'email_communication' ? 'Comunicación Email' : 'Validación DGI'}
                     </span>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                       config.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
@@ -469,9 +473,11 @@ export function ExternalValidationModule() {
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                         log.config?.config_type === 'pdf_generation'
                           ? 'bg-purple-100 text-purple-700'
+                          : log.config?.config_type === 'email_communication'
+                          ? 'bg-green-100 text-green-700'
                           : 'bg-blue-100 text-blue-700'
                       }`}>
-                        {log.config?.config_type === 'pdf_generation' ? 'PDF' : 'DGI'}
+                        {log.config?.config_type === 'pdf_generation' ? 'PDF' : log.config?.config_type === 'email_communication' ? 'EMAIL' : 'DGI'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -634,6 +640,7 @@ export function ExternalValidationModule() {
                   >
                     <option value="validation">Validación DGI</option>
                     <option value="pdf_generation">Generación de PDF</option>
+                    <option value="email_communication">Comunicación Email</option>
                   </select>
                 </div>
 
