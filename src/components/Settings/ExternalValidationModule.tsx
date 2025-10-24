@@ -826,7 +826,7 @@ export function ExternalValidationModule() {
 }`}</pre>
                     </div>
                   </div>
-                ) : (
+                ) : formData.config_type === 'pdf_generation' ? (
                   <div className="col-span-2 bg-purple-50 rounded-lg p-6 border border-purple-200">
                     <h3 className="text-sm font-semibold text-purple-900 mb-2 flex items-center space-x-2">
                       <FileText size={16} />
@@ -892,7 +892,7 @@ export function ExternalValidationModule() {
 }`}</pre>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {formData.config_type === 'validation' ? (
                   <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
