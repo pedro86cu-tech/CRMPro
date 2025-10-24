@@ -567,8 +567,14 @@ export function OrdersModule() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusColor = (statusCode: string) => {
+    const status = orderStatuses.find(s => s.code === statusCode);
+    if (status && status.color) {
+      const color = status.color.replace('#', '');
+      return `border`;
+    }
+
+    switch (statusCode) {
       case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
       case 'confirmed': return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'in_progress': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
@@ -577,12 +583,16 @@ export function OrdersModule() {
       case 'delivered': return 'bg-teal-50 text-teal-700 border-teal-200';
       case 'completed': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
+      case 'sent-error-email': return 'bg-red-50 text-red-700 border-red-200';
       default: return 'bg-slate-50 text-slate-700 border-slate-200';
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
+  const getStatusLabel = (statusCode: string) => {
+    const status = orderStatuses.find(s => s.code === statusCode);
+    if (status) return status.name;
+
+    switch (statusCode) {
       case 'pending': return 'Pendiente';
       case 'confirmed': return 'Confirmada';
       case 'in_progress': return 'En Progreso';
@@ -591,12 +601,16 @@ export function OrdersModule() {
       case 'delivered': return 'Entregada';
       case 'completed': return 'Completada';
       case 'cancelled': return 'Cancelada';
-      default: return status;
+      case 'sent-error-email': return 'Error Enviando Email';
+      default: return statusCode;
     }
   };
 
-  const getPaymentStatusLabel = (status: string) => {
-    switch (status) {
+  const getPaymentStatusLabel = (statusCode: string) => {
+    const status = paymentStatuses.find(s => s.code === statusCode);
+    if (status) return status.name;
+
+    switch (statusCode) {
       case 'unpaid': return 'Sin Pagar';
       case 'pending': return 'Pendiente';
       case 'processing': return 'Procesando';
@@ -604,7 +618,8 @@ export function OrdersModule() {
       case 'paid': return 'Pagado';
       case 'refunded': return 'Reembolsado';
       case 'cancelled': return 'Cancelado';
-      default: return status;
+      case 'confirmed': return 'Confirmado';
+      default: return statusCode;
     }
   };
 
@@ -842,12 +857,17 @@ export function OrdersModule() {
                       value={order.status}
                       onChange={(e) => updateStatus(order.id, e.target.value as any)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium border cursor-pointer transition ${getStatusColor(order.status)}`}
+                      style={{
+                        backgroundColor: orderStatuses.find(s => s.code === order.status)?.color ? `${orderStatuses.find(s => s.code === order.status)?.color}20` : undefined,
+                        color: orderStatuses.find(s => s.code === order.status)?.color || undefined,
+                        borderColor: orderStatuses.find(s => s.code === order.status)?.color || undefined
+                      }}
                     >
-                      <option value="pending">Pendiente</option>
-                      <option value="confirmed">Confirmada</option>
-                      <option value="in_progress">En Progreso</option>
-                      <option value="completed">Completada</option>
-                      <option value="cancelled">Cancelada</option>
+                      {orderStatuses.map(status => (
+                        <option key={status.code} value={status.code}>
+                          {status.name}
+                        </option>
+                      ))}
                     </select>
                   </td>
                   <td className="py-4 px-4">
@@ -1888,14 +1908,11 @@ export function OrdersModule() {
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                       required
                     >
-                      <option value="pending">Pendiente</option>
-                      <option value="confirmed">Confirmada</option>
-                      <option value="in_progress">En Progreso</option>
-                      <option value="processing">Procesando</option>
-                      <option value="shipped">Enviada</option>
-                      <option value="delivered">Entregada</option>
-                      <option value="completed">Completada</option>
-                      <option value="cancelled">Cancelada</option>
+                      {orderStatuses.map(status => (
+                        <option key={status.code} value={status.code}>
+                          {status.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -1908,13 +1925,11 @@ export function OrdersModule() {
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                       required
                     >
-                      <option value="unpaid">Sin Pagar</option>
-                      <option value="pending">Pendiente</option>
-                      <option value="processing">Procesando</option>
-                      <option value="partial">Parcial</option>
-                      <option value="paid">Pagado</option>
-                      <option value="refunded">Reembolsado</option>
-                      <option value="cancelled">Cancelado</option>
+                      {paymentStatuses.map(status => (
+                        <option key={status.code} value={status.code}>
+                          {status.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1929,13 +1944,18 @@ export function OrdersModule() {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Método de Pago
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={editFormData.payment_method}
                     onChange={(e) => setEditFormData({ ...editFormData, payment_method: e.target.value })}
-                    placeholder="ej: Mercado Pago, Stripe, Transferencia"
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                  />
+                  >
+                    <option value="">Seleccionar método</option>
+                    {paymentMethods.map(method => (
+                      <option key={method.code} value={method.name}>
+                        {method.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
