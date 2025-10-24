@@ -206,43 +206,11 @@ export function CommissionBillingModule() {
       const taxAmount = selectedGroup.iva_amount;
       const totalAmount = selectedGroup.total_with_iva;
 
-      const { data: partnerClient, error: clientError } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('rut', partner.rut)
-        .maybeSingle();
-
-      let clientId = partnerClient?.id;
-
-      if (!clientId) {
-        const { data: newClient, error: newClientError } = await supabase
-          .from('clients')
-          .insert({
-            contact_name: partner.name,
-            company_name: partner.company_name || partner.name,
-            rut: partner.rut,
-            email: partner.email,
-            phone: partner.phone,
-            address: partner.address,
-            city: partner.city,
-            country: partner.country,
-            status: 'active',
-            source: 'partner'
-          })
-          .select('id')
-          .single();
-
-        if (newClientError) {
-          throw new Error('Error creando cliente: ' + newClientError.message);
-        }
-        clientId = newClient.id;
-      }
-
       const { data: commissionInvoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
           invoice_number: invoiceNumber,
-          client_id: clientId,
+          client_id: null,
           order_id: null,
           partner_id: partner.id,
           issue_date: new Date().toISOString().split('T')[0],
@@ -270,7 +238,8 @@ export function CommissionBillingModule() {
         .from('orders')
         .insert({
           order_number: `COM-ORD-${Date.now()}`,
-          client_id: clientId,
+          client_id: null,
+          partner_id: partner.id,
           status: 'completed',
           payment_status: 'unpaid',
           total_amount: totalAmount,

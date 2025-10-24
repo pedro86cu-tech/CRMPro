@@ -48,7 +48,8 @@ Deno.serve(async (req: Request) => {
       .select(`
         *,
         clients (*),
-        orders (*)
+        orders (*),
+        partners (*)
       `)
       .eq("id", invoice_id)
       .single();
@@ -135,9 +136,11 @@ Deno.serve(async (req: Request) => {
     const calculatedIva = items.reduce((sum, item) => sum + item.iva, 0);
     const calculatedTotal = items.reduce((sum, item) => sum + item.total, 0);
 
+    const recipientEmail = invoice.clients?.email || invoice.partners?.email || "";
+
     const requestPayload = {
       template_name: "invoice_email_service",
-      recipient_email: invoice.clients?.email || "",
+      recipient_email: recipientEmail,
       order_id: invoice.orders?.dogcatify_order_id || invoice.order_id,
       wait_for_invoice: false,
       data: {
