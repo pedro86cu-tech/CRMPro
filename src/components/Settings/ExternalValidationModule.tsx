@@ -926,7 +926,7 @@ export function ExternalValidationModule() {
                       </div>
                     </div>
                   </div>
-                ) : (
+                ) : formData.config_type === 'pdf_generation' ? (
                   <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
                     <div className="mb-4">
                       <h3 className="text-sm font-semibold text-slate-900 mb-2">Response de Generación de PDF</h3>
@@ -952,6 +952,52 @@ export function ExternalValidationModule() {
                       <div className="mt-3 p-3 bg-purple-100 rounded text-xs text-purple-800">
                         <strong>Nota:</strong> Solo se verifica que <code className="bg-purple-200 px-1 py-0.5 rounded">success === true</code>.
                         El PDF no se guarda en este sistema, el envío por email lo gestiona el sistema externo.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="col-span-2 bg-slate-50 rounded-lg p-6 border border-slate-200">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-semibold text-slate-900 mb-2">Comunicación por Email</h3>
+                      <p className="text-xs text-slate-600 mb-3">
+                        El sistema envía comunicaciones automáticas cuando una orden cambia a <code className="bg-slate-200 px-1 py-0.5 rounded">confirmed</code>.
+                        Si <code className="bg-slate-200 px-1 py-0.5 rounded">success: false</code>, la orden se marca como <code className="bg-red-100 text-red-700 px-1 py-0.5 rounded">sent-error-email</code>.
+                      </p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <h4 className="text-sm font-semibold text-green-900 mb-2">Ejemplo de Request - Comunicación Email</h4>
+                      <div className="bg-white rounded p-3 text-xs font-mono text-slate-700 overflow-x-auto">
+                        <pre className="whitespace-pre-wrap">{`{
+  "template_name": "agenda_confirmation",
+  "recipient_email": "cliente@ejemplo.com",
+  "order_id": "5b334765-7fb8-47ae-817e-5555",
+  "wait_for_invoice": true,
+  "data": {
+    "client_name": "Pedro Ayala Ortiz",
+    "service_name": "Baño completo",
+    "provider_name": "Peluquería Dinky",
+    "reservation_date": "6/10/2025",
+    "reservation_time": "09:00",
+    "pet_name": "Eron"
+  }
+}`}</pre>
+                      </div>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200 mt-4">
+                      <h4 className="text-sm font-semibold text-green-900 mb-2">Ejemplo de Response - Comunicación Email</h4>
+                      <div className="bg-white rounded p-3 text-xs font-mono text-slate-700 overflow-x-auto">
+                        <pre className="whitespace-pre-wrap">{`{
+  "success": true,
+  "message": "Email sent successfully with existing PDF",
+  "log_id": "0fc7cd5c-87c7-4964-a9a6-52c9577f90f2",
+  "pending_communication_id": "b19f72e6-9d87-4535-bd41-e36972d5261e",
+  "status": "sent",
+  "pdf_was_ready": true
+}`}</pre>
+                      </div>
+                      <div className="mt-3 p-3 bg-green-100 rounded text-xs text-green-800">
+                        <strong>Importante:</strong> Si <code className="bg-green-200 px-1 py-0.5 rounded">success: false</code>,
+                        la orden se actualiza automáticamente al estado <code className="bg-red-100 text-red-700 px-1 py-0.5 rounded">sent-error-email</code>.
                       </div>
                     </div>
                   </div>

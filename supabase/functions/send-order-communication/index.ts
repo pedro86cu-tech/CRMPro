@@ -77,6 +77,13 @@ Deno.serve(async (req: Request) => {
 
     if (!emailConfig) {
       console.error("❌ No hay configuración activa de Email Communication");
+      
+      // Actualizar orden a sent-error-email
+      await supabase
+        .from("orders")
+        .update({ status: "sent-error-email" })
+        .eq("id", order_id);
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -125,75 +132,127 @@ Deno.serve(async (req: Request) => {
     console.log("🚀 Llamando a pending-communication:", emailConfig.api_url);
     
     const startTime = Date.now();
-    const communicationResponse = await fetch(emailConfig.api_url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(emailConfig.api_key ? { "Authorization": `Bearer ${emailConfig.api_key}` } : {}),
-      },
-      body: JSON.stringify(communicationPayload),
-    });
-    const duration = Date.now() - startTime;
-
-    const responseText = await communicationResponse.text();
+    let communicationResponse;
     let communicationResult: any;
-
+    
     try {
-      communicationResult = JSON.parse(responseText);
-    } catch {
-      communicationResult = { raw: responseText };
-    }
+      communicationResponse = await fetch(emailConfig.api_url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(emailConfig.api_key ? { "Authorization": `Bearer ${emailConfig.api_key}` } : {}),
+        },
+        body: JSON.stringify(communicationPayload),
+      });
+      
+      const duration = Date.now() - startTime;
+      const responseText = await communicationResponse.text();
 
-    console.log("📨 Respuesta de pending-communication:", communicationResult);
+      try {
+        communicationResult = JSON.parse(responseText);
+      } catch {
+        communicationResult = { raw: responseText };
+      }
 
-    // Actualizar el log con la respuesta
-    if (logEntry) {
+      console.log("📨 Respuesta de pending-communication:", communicationResult);
+
+      // Verificar si success es false en la respuesta
+      const isSuccess = communicationResponse.ok && communicationResult.success !== false;
+
+      // Actualizar el log con la respuesta
+      if (logEntry) {
+        await supabase
+          .from("external_validation_logs")
+          .update({
+            response_payload: communicationResult,
+            status_code: communicationResponse.status,
+            success: isSuccess,
+            status: isSuccess ? "success" : "error",
+            validation_result: isSuccess ? "approved" : "rejected",
+            duration_ms: duration,
+          })
+          .eq("id", logEntry.id);
+      }
+
+      // Si la respuesta indica fallo (success: false), actualizar orden
+      if (!isSuccess) {
+        console.error("❌ Error en pending-communication - Actualizando orden a sent-error-email");
+        
+        await supabase
+          .from("orders")
+          .update({ status: "sent-error-email" })
+          .eq("id", order_id);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "Error en la comunicación por email",
+            status: communicationResponse.status,
+            details: communicationResult,
+            order_status_updated: "sent-error-email",
+          }),
+          {
+            status: communicationResponse.status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      console.log("✅ Comunicación enviada exitosamente");
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          order_id: order.id,
+          order_number: order.order_number,
+          template_name,
+          recipient_email,
+          communication_response: communicationResult,
+          message: "Comunicación enviada exitosamente",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+      
+    } catch (fetchError) {
+      console.error("❌ Error llamando a pending-communication:", fetchError);
+      
+      // Actualizar orden a sent-error-email en caso de error de red
       await supabase
-        .from("external_validation_logs")
-        .update({
-          response_payload: communicationResult,
-          status_code: communicationResponse.status,
-          success: communicationResponse.ok,
-          status: communicationResponse.ok ? "success" : "error",
-          validation_result: communicationResponse.ok ? "approved" : "rejected",
-          duration_ms: duration,
-        })
-        .eq("id", logEntry.id);
-    }
-
-    if (!communicationResponse.ok) {
-      console.error("❌ Error en pending-communication:", communicationResponse.status, communicationResult);
+        .from("orders")
+        .update({ status: "sent-error-email" })
+        .eq("id", order_id);
+      
+      // Actualizar log si existe
+      if (logEntry) {
+        await supabase
+          .from("external_validation_logs")
+          .update({
+            response_payload: { error: fetchError.message },
+            status_code: 0,
+            success: false,
+            status: "error",
+            validation_result: "rejected",
+            duration_ms: Date.now() - startTime,
+          })
+          .eq("id", logEntry.id);
+      }
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Error llamando a pending-communication",
-          status: communicationResponse.status,
-          details: communicationResult,
+          error: "Error de red llamando a pending-communication",
+          details: fetchError.message,
+          order_status_updated: "sent-error-email",
         }),
         {
-          status: communicationResponse.status,
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
-
-    console.log("✅ Comunicación enviada exitosamente");
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        order_id: order.id,
-        order_number: order.order_number,
-        template_name,
-        recipient_email,
-        communication_response: communicationResult,
-        message: "Comunicación enviada exitosamente",
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
   } catch (error) {
     console.error("❌ Error procesando comunicación:", error);
     return new Response(
