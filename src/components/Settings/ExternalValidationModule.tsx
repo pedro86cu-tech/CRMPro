@@ -55,6 +55,9 @@ export function ExternalValidationModule() {
   const [testing, setTesting] = useState(false);
   const [useVisualMapper, setUseVisualMapper] = useState(true);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const logsPerPage = 10;
 
   const { user } = useAuth();
   const toast = useToast();
@@ -75,9 +78,9 @@ export function ExternalValidationModule() {
 
   useEffect(() => {
     fetchConfigs();
-    fetchLogs();
+    fetchLogs(currentPage);
     fetchInvoices();
-  }, []);
+  }, [currentPage]);
 
   const fetchConfigs = async () => {
     const { data, error } = await supabase
@@ -90,18 +93,22 @@ export function ExternalValidationModule() {
     }
   };
 
-  const fetchLogs = async () => {
-    const { data, error } = await supabase
+  const fetchLogs = async (page: number = 1) => {
+    const from = (page - 1) * logsPerPage;
+    const to = from + logsPerPage - 1;
+
+    const { data, error, count } = await supabase
       .from('external_invoice_validation_log')
       .select(`
         *,
         config:external_invoice_api_config(name, config_type)
-      `)
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(100);
+      .range(from, to);
 
     if (!error && data) {
       setLogs(data);
+      setTotalLogs(count || 0);
     }
   };
 
@@ -507,6 +514,64 @@ export function ExternalValidationModule() {
             <div className="text-center py-12">
               <FileText size={48} className="mx-auto text-slate-300 mb-4" />
               <p className="text-slate-600">No hay registros de validación</p>
+            </div>
+          )}
+
+          {totalLogs > logsPerPage && (
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+              <div className="text-sm text-slate-600">
+                Mostrando {((currentPage - 1) * logsPerPage) + 1} a {Math.min(currentPage * logsPerPage, totalLogs)} de {totalLogs} registros
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.ceil(totalLogs / logsPerPage) }, (_, i) => i + 1)
+                    .filter(page => {
+                      const totalPages = Math.ceil(totalLogs / logsPerPage);
+                      if (totalPages <= 7) return true;
+                      if (page === 1 || page === totalPages) return true;
+                      if (page >= currentPage - 1 && page <= currentPage + 1) return true;
+                      if (page === currentPage - 2 || page === currentPage + 2) return '...';
+                      return false;
+                    })
+                    .map((page, idx, arr) => {
+                      if (page === '...' && arr[idx - 1] !== '...') {
+                        return (
+                          <span key={`ellipsis-${idx}`} className="px-2 text-slate-400">
+                            ...
+                          </span>
+                        );
+                      }
+                      if (page === '...') return null;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page as number)}
+                          className={`px-3 py-1 border rounded-lg text-sm font-medium transition ${
+                            currentPage === page
+                              ? 'bg-teal-600 text-white border-teal-600'
+                              : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalLogs / logsPerPage), prev + 1))}
+                  disabled={currentPage === Math.ceil(totalLogs / logsPerPage)}
+                  className="px-3 py-1 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
           )}
         </div>
